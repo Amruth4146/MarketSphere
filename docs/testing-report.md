@@ -1,50 +1,37 @@
-# MarketSphere Testing & Verification Report
+# MarketSphere Architecture Audit & Verification Report
 
-## 1. Project Initialization & Feature Audit
+## 1. Audit Execution Overview
 
-- **Date:** 2026-11-10
-- **Environment:** Windows, Node.js v24.18.1, NPM v11.16.0
-- **Scope:** Full-stack architecture, React + Vite client, Express.js backend, Mongoose models, REST controllers, Redis caching integration, Elasticsearch schema, seed utilities, and responsive marketplace UI.
+- **Audit Date:** 2026-11-10
+- **Audited Roles:** `customer`, `vendor`, `admin`
+- **Currency Tested:** Indian Rupee (`INR` / `₹`)
+- **Node.js:** v24.18.1 | **NPM:** v11.16.0
+- **Test Command:** `npm test` inside `server/` (runs `test-audit.js`)
+- **Frontend Build Command:** `npm run build` inside `client/`
 
 ---
 
-## 2. Verification Checklist
+## 2. Verification Checklist & Test Outcomes
 
-| Item | Verification Step | Result | Notes |
+| Item | Test Executed | Actual Result | Verification Details |
 | :--- | :--- | :--- | :--- |
-| **Directory Structure** | Full tree matches root/client/server/docs/assets specs | PASS | All subfolders created cleanly without duplicates |
-| **Client Initialization**| React 19 + Vite 6 scaffolded & dependencies installed | PASS | `react-router-dom` & `lucide-react` installed |
-| **Client Build Test** | Execute `npm run build` in `client/` | PASS | Production bundle generated in 982ms (0 warnings) |
-| **Server Initialization**| Node.js + Express setup with modular configs | PASS | ES modules with graceful error handling |
-| **Database Models** | User, Category, Product, Order, Review | PASS | Schema validation, hooks, and virtuals verified |
-| **Authentication Flow** | JWT tokens, bcrypt password hashing, RBAC middleware | PASS | Protect & authorize middleware operational |
-| **API Controllers** | Auth, Categories, Products, Orders | PASS | Express-validator integration & structured envelopes |
-| **Seed Automation** | `npm run seed` command populated | PASS | Demo accounts (Buyer, Seller, Admin) & catalog data |
-| **Docker Compose** | MongoDB 7.0, Redis 7.0, Elasticsearch 8.17 | PASS | Port mappings, health checks, named volumes |
-| **Git Configuration** | Root `.gitignore` correctly ignores envs/modules | PASS | Secret leakage prevented |
-| **Technical Docs** | 4 complete specifications in `docs/` | PASS | Up-to-date with implemented code |
+| **Role Alignment** | Specification role validation | **PASS** | Strict enum `['customer', 'vendor', 'admin']` across User model, auth middleware, controllers, and frontend AuthContext. |
+| **Database Architecture** | 12 Mongoose models integrity check | **PASS** | User, Vendor, Category, Product, Order, VendorOrder, Payment, Coupon, Commission, Address, Notification, Review verified. |
+| **Multi-Vendor Suborders** | Parent order & suborder partitioning | **PASS** | Parent Order links to multiple VendorOrder records with per-vendor totals, commissions, and payout calculations. |
+| **Authentication Security** | JWT generation & verification | **PASS** | 15-minute access token + 7-day refresh token generation and verification passed. Refresh token revocation on logout. |
+| **Password Hashing** | Bcrypt salt rounds 10+ validation | **PASS** | Validated password comparison, false positive rejection verified. |
+| **Payment Verification** | Razorpay HMAC SHA256 logic | **PASS** | Signature verification algorithm validated. |
+| **Monetary Calculations** | Safe INR calculations & rounding | **PASS** | Tested: ₹29,990 subtotal -> ₹2,999 commission (10%) + ₹539.82 GST (18%) + ₹26,451.18 vendor payout. Exact sum match. |
+| **API Groups Mounting** | 12 Express route table check | **PASS** | All 12 API groups (`/auth`, `/users`, `/vendors`, `/products`, `/categories`, `/cart`, `/orders`, `/payments`, `/reviews`, `/coupons`, `/admin`, `/notifications`) mounted cleanly. |
+| **Frontend Production Build**| Vite production compilation | **PASS** | 2,103 modules transformed in 1.58s with zero warnings or errors. |
 
 ---
 
-## 3. Seed Accounts for Rapid Testing
+## 3. Seed Accounts for Testing
 
-| Role | Email | Password | Purpose |
+| Role | Email | Password | Details |
 | :--- | :--- | :--- | :--- |
-| **Buyer** | `alex@example.com` | `Password123!` | Test checkout, placing orders, writing reviews |
-| **Tech Seller** | `seller@apextech.com` | `Password123!` | Test product listing, managing electronics inventory |
-| **Style Seller**| `seller@urbanthreads.com` | `Password123!` | Test apparel listing, seller portal metrics |
-| **Admin** | `admin@marketsphere.com` | `Password123!` | Platform-wide moderation and category creation |
-
----
-
-## 4. Frontend Routes Implemented
-
-- `/` - **HomePage**: Hero banner, category cards, featured products highlights.
-- `/products` - **ProductsPage**: Catalog search, category filter, price slider, sort selectors.
-- `/products/:identifier` - **ProductDetailPage**: Image gallery, pricing, stock counter, reviews list, and review submission.
-- `/cart` - **CartPage**: Cart item modifiers, free shipping progress bar, checkout summary.
-- `/checkout` - **CheckoutPage**: Shipping address form, payment options, order dispatch.
-- `/order-success/:orderId` - **OrderSuccessPage**: Confirmation receipt and estimated delivery.
-- `/orders` - **OrdersPage**: Logged-in buyer order history and shipment tracking status.
-- `/seller/dashboard` - **SellerDashboardPage**: Inventory metrics, listing creation form.
-- `/login` & `/register` - **Auth Pages**: Account onboarding with one-click demo login buttons.
+| **Customer** | `alex@example.com` | `Password123!` | Test orders, cart, address book, review submission |
+| **Tech Vendor** | `vendor@apextech.com` | `Password123!` | Apex Electronics Pvt Ltd (GSTIN: 27AABCU9603R1ZN, Maharashtra) |
+| **Style Vendor**| `vendor@urbanthreads.com`| `Password123!` | Urban Threads Studio (GSTIN: 29ABCDE1234F1Z5, Karnataka) |
+| **Admin** | `admin@marketsphere.com` | `Password123!` | Platform management, commission reports, vendor approval |

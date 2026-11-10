@@ -80,3 +80,4 @@ export const createCategory = async (req, res, next) => {
     next(error);
   }
 };
+

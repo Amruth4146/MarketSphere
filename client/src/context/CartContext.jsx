@@ -12,6 +12,7 @@ export const CartProvider = ({ children }) => {
     }
   });
 
+  const [coupon, setCoupon] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   useEffect(() => {
@@ -20,12 +21,13 @@ export const CartProvider = ({ children }) => {
 
   const addToCart = (product, quantity = 1) => {
     setCartItems((prev) => {
-      const existing = prev.find((item) => item.productId === (product._id || product.productId));
+      const pId = product._id || product.productId;
+      const existing = prev.find((item) => item.productId === pId);
       const activePrice = product.discountPrice || product.price;
 
       if (existing) {
         return prev.map((item) =>
-          item.productId === (product._id || product.productId)
+          item.productId === pId
             ? {
                 ...item,
                 quantity: Math.min(item.quantity + quantity, item.stock || 99),
@@ -37,14 +39,14 @@ export const CartProvider = ({ children }) => {
       return [
         ...prev,
         {
-          productId: product._id || product.productId,
+          productId: pId,
           title: product.title,
           price: activePrice,
           originalPrice: product.discountPrice ? product.price : null,
           image: product.images?.[0] || product.image || '',
           stock: product.stock ?? 99,
           slug: product.slug,
-          sellerId: product.sellerId?._id || product.sellerId,
+          vendorId: product.vendorId?._id || product.vendorId || product.sellerId,
           quantity,
         },
       ];
@@ -71,13 +73,28 @@ export const CartProvider = ({ children }) => {
 
   const clearCart = () => {
     setCartItems([]);
+    setCoupon(null);
   };
+
+  const applyCoupon = (couponData) => {
+    setCoupon(couponData);
+  };
+
+  const removeCoupon = () => {
+    setCoupon(null);
+  };
+
+  const FREE_SHIPPING_THRESHOLD_INR = 999;
+  const DEFAULT_SHIPPING_FEE_INR = 99;
+  const GST_RATE = 0.18; // 18% GST
 
   const itemsCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
   const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const shipping = subtotal > 50 || subtotal === 0 ? 0 : 9.99;
-  const tax = Math.round(subtotal * 0.08 * 100) / 100;
-  const total = Math.round((subtotal + shipping + tax) * 100) / 100;
+  const discountAmount = coupon?.discountAmount || 0;
+  const taxableSubtotal = Math.max(0, subtotal - discountAmount);
+  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD_INR || subtotal === 0 ? 0 : DEFAULT_SHIPPING_FEE_INR;
+  const tax = Math.round(taxableSubtotal * GST_RATE * 100) / 100;
+  const total = Math.round((taxableSubtotal + shipping + tax) * 100) / 100;
 
   return (
     <CartContext.Provider
@@ -85,13 +102,18 @@ export const CartProvider = ({ children }) => {
         cartItems,
         itemsCount,
         subtotal,
+        discountAmount,
+        coupon,
         shipping,
         tax,
         total,
+        freeShippingThreshold: FREE_SHIPPING_THRESHOLD_INR,
         addToCart,
         removeFromCart,
         updateQuantity,
         clearCart,
+        applyCoupon,
+        removeCoupon,
         isCartOpen,
         setIsCartOpen,
       }}

@@ -17,8 +17,13 @@ export const registerValidator = [
     .withMessage('Password must be at least 6 characters long'),
   body('role')
     .optional()
-    .isIn(['buyer', 'seller'])
-    .withMessage('Role must be either buyer or seller'),
+    .isIn(['customer', 'vendor'])
+    .withMessage('Role must be either customer or vendor'),
+  body('businessName')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 120 })
+    .withMessage('Business name must be between 2 and 120 characters'),
 ];
 
 export const loginValidator = [
@@ -27,7 +32,5 @@ export const loginValidator = [
     .isEmail()
     .withMessage('Please enter a valid email address')
     .normalizeEmail(),
-  body('password')
-    .notEmpty()
-    .withMessage('Password is required'),
+  body('password').notEmpty().withMessage('Password is required'),
 ];

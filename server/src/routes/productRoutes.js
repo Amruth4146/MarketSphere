@@ -6,7 +6,6 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  addReview,
 } from '../controllers/productController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import { validateRequest } from '../middleware/validateRequest.js';
@@ -18,19 +17,16 @@ router.get('/', getProducts);
 router.get('/featured', getFeaturedProducts);
 router.get('/:identifier', getProductBySlugOrId);
 
-// Seller/Admin protected routes
+// Vendor / Admin management routes
 router.post(
   '/',
   protect,
-  authorize('seller', 'admin'),
+  authorize('vendor', 'admin'),
   productValidator,
   validateRequest,
   createProduct
 );
-router.put('/:id', protect, authorize('seller', 'admin'), updateProduct);
-router.delete('/:id', protect, authorize('seller', 'admin'), deleteProduct);
-
-// Reviews
-router.post('/:id/reviews', protect, addReview);
+router.put('/:id', protect, authorize('vendor', 'admin'), updateProduct);
+router.delete('/:id', protect, authorize('vendor', 'admin'), deleteProduct);
 
 export default router;

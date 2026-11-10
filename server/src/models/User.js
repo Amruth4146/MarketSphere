@@ -1,29 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-const addressSchema = new mongoose.Schema(
-  {
-    street: { type: String, required: true },
-    city: { type: String, required: true },
-    state: { type: String, required: true },
-    postalCode: { type: String, required: true },
-    country: { type: String, required: true, default: 'US' },
-    isDefault: { type: Boolean, default: false },
-  },
-  { _id: true }
-);
-
-const sellerProfileSchema = new mongoose.Schema(
-  {
-    businessName: { type: String, trim: true },
-    description: { type: String },
-    rating: { type: Number, default: 0, min: 0, max: 5 },
-    ratingCount: { type: Number, default: 0 },
-    isVerified: { type: Boolean, default: false },
-  },
-  { _id: false }
-);
-
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -51,8 +28,9 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['buyer', 'seller', 'admin'],
-      default: 'buyer',
+      enum: ['customer', 'vendor', 'admin'],
+      default: 'customer',
+      required: true,
     },
     avatar: {
       type: String,
@@ -61,9 +39,23 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       default: '',
+      trim: true,
     },
-    addresses: [addressSchema],
-    sellerProfile: sellerProfileSchema,
+    vendorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vendor',
+      default: null,
+    },
+    wishlist: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product',
+      },
+    ],
+    refreshToken: {
+      type: String,
+      select: false,
+    },
     isActive: {
       type: Boolean,
       default: true,

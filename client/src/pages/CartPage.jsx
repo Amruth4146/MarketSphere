@@ -1,25 +1,51 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trash2, ShoppingBag, ArrowRight, Truck, ShieldCheck } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, Truck, ShieldCheck, Tag, X } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
+import { productService } from '../services/productService.js';
 
 export const CartPage = () => {
   const {
     cartItems,
     itemsCount,
     subtotal,
+    discountAmount,
+    coupon,
     shipping,
     tax,
     total,
+    freeShippingThreshold,
     updateQuantity,
     removeFromCart,
     clearCart,
+    applyCoupon,
+    removeCoupon,
   } = useCart();
 
   const navigate = useNavigate();
-  const freeShippingThreshold = 50;
+  const [couponCode, setCouponCode] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
+
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
   const progressPercent = Math.min(100, (subtotal / freeShippingThreshold) * 100);
+
+  const handleApplyCoupon = async (e) => {
+    e.preventDefault();
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponError('');
+
+    try {
+      const res = await productService.validateCoupon(couponCode.trim(), subtotal);
+      applyCoupon(res);
+      setCouponCode('');
+    } catch (err) {
+      setCouponError(err.message || 'Invalid coupon code');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
 
   if (cartItems.length === 0) {
     return (
@@ -63,7 +89,7 @@ export const CartPage = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2.5rem', alignItems: 'start' }}>
         {/* Items List */}
         <div>
-          {/* Free Shipping Progress Indicator */}
+          {/* Free Shipping Progress Indicator (India ₹999 Threshold) */}
           <div style={{
             backgroundColor: '#ffffff',
             borderRadius: 'var(--radius-md)',
@@ -75,11 +101,11 @@ export const CartPage = () => {
               <Truck size={18} color="var(--primary)" />
               {remainingForFreeShipping > 0 ? (
                 <span>
-                  Add <strong style={{ color: 'var(--primary)' }}>${remainingForFreeShipping.toFixed(2)}</strong> more to unlock <strong>FREE Express Shipping</strong>!
+                  Add <strong style={{ color: 'var(--primary)' }}>₹{remainingForFreeShipping.toLocaleString('en-IN')}</strong> more to unlock <strong>FREE Express Shipping</strong>!
                 </span>
               ) : (
                 <span style={{ color: 'var(--success)' }}>
-                  🎉 You have unlocked <strong>FREE Express Shipping</strong>!
+                  🎉 You have unlocked <strong>FREE Express Shipping</strong> across India!
                 </span>
               )}
             </div>
@@ -142,7 +168,7 @@ export const CartPage = () => {
                   </Link>
 
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                    Unit: ${item.price.toFixed(2)}
+                    Unit: ₹{item.price.toLocaleString('en-IN')}
                   </div>
 
                   {/* Quantity modifier */}
@@ -183,7 +209,7 @@ export const CartPage = () => {
                 </div>
 
                 <div style={{ textAlign: 'right', fontWeight: 800, fontSize: '1.1rem' }}>
-                  ${(item.price * item.quantity).toFixed(2)}
+                  ₹{(item.price * item.quantity).toLocaleString('en-IN')}
                 </div>
               </div>
             ))}
@@ -200,29 +226,91 @@ export const CartPage = () => {
         }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.25rem' }}>Order Summary</h2>
 
+          {/* Coupon Code Form */}
+          <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Tag size={15} color="var(--primary)" /> Have a Promo Code?
+            </div>
+            {coupon ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.55rem 0.85rem',
+                backgroundColor: '#dcfce7',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.85rem',
+              }}>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>
+                  🎉 {coupon.code} (-₹{coupon.discountAmount.toLocaleString('en-IN')})
+                </span>
+                <button onClick={removeCoupon} style={{ color: '#15803d' }}>
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleApplyCoupon} style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  placeholder="e.g. WELCOME10"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                    fontSize: '0.85rem',
+                    textTransform: 'uppercase',
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={couponLoading}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                >
+                  {couponLoading ? '...' : 'Apply'}
+                </button>
+              </form>
+            )}
+            {couponError && (
+              <div style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '0.4rem' }}>
+                {couponError}
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.925rem', borderBottom: '1px solid var(--border)', paddingBottom: '1.25rem', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Subtotal ({itemsCount} items)</span>
-              <span style={{ fontWeight: 600 }}>${subtotal.toFixed(2)}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Items Subtotal ({itemsCount})</span>
+              <span style={{ fontWeight: 600 }}>₹{subtotal.toLocaleString('en-IN')}</span>
             </div>
 
+            {discountAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
+                <span>Coupon Discount</span>
+                <span style={{ fontWeight: 600 }}>-₹{discountAmount.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Estimated Shipping</span>
+              <span style={{ color: 'var(--text-muted)' }}>Shipping (Express India)</span>
               <span style={{ fontWeight: 600, color: shipping === 0 ? 'var(--success)' : 'inherit' }}>
-                {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
+                {shipping === 0 ? 'FREE' : `₹${shipping.toLocaleString('en-IN')}`}
               </span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Sales Tax (8%)</span>
-              <span style={{ fontWeight: 600 }}>${tax.toFixed(2)}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Estimated GST (18%)</span>
+              <span style={{ fontWeight: 600 }}>₹{tax.toLocaleString('en-IN')}</span>
             </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.75rem' }}>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800 }}>Total</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 800 }}>Total Amount</span>
             <span style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--primary)' }}>
-              ${total.toFixed(2)}
+              ₹{total.toLocaleString('en-IN')}
             </span>
           </div>
 
@@ -235,7 +323,7 @@ export const CartPage = () => {
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.775rem', color: 'var(--text-muted)' }}>
-            <ShieldCheck size={16} color="var(--success)" /> 256-Bit SSL Encrypted Checkout
+            <ShieldCheck size={16} color="var(--success)" /> 256-Bit SSL Encrypted Indian Gateway
           </div>
         </div>
       </div>

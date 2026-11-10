@@ -13,3 +13,4 @@ router.get('/:slug', getCategoryBySlug);
 router.post('/', protect, authorize('admin'), createCategory);
 
 export default router;
+

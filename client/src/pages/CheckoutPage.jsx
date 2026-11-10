@@ -1,24 +1,26 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ShieldCheck, CreditCard, Lock, ArrowLeft } from 'lucide-react';
+import { CreditCard, Lock, ArrowLeft, QrCode } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { orderService } from '../services/orderService.js';
 
 export const CheckoutPage = () => {
-  const { cartItems, subtotal, shipping, tax, total, clearCart } = useCart();
+  const { cartItems, subtotal, discountAmount, coupon, shipping, tax, total, clearCart } = useCart();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const [address, setAddress] = useState({
-    street: user?.addresses?.[0]?.street || '123 Market Boulevard',
-    city: user?.addresses?.[0]?.city || 'San Francisco',
-    state: user?.addresses?.[0]?.state || 'CA',
-    postalCode: user?.addresses?.[0]?.postalCode || '94105',
-    country: user?.addresses?.[0]?.country || 'US',
+    fullName: user?.name || '',
+    phone: user?.phone || '9876543210',
+    street: 'Flat 402, Trade Tower, Lower Parel',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    postalCode: '400013',
+    country: 'India',
   });
 
-  const [paymentMethod, setPaymentMethod] = useState('credit_card');
+  const [paymentMethod, setPaymentMethod] = useState('razorpay');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -51,13 +53,14 @@ export const CheckoutPage = () => {
         })),
         shippingAddress: address,
         paymentMethod,
+        couponCode: coupon?.code || undefined,
       };
 
       const res = await orderService.createOrder(orderPayload);
       clearCart();
       navigate(`/order-success/${res._id || res.orderNumber}`);
     } catch (err) {
-      setError(err.message || 'Failed to place order. Please check your inventory or credentials.');
+      setError(err.message || 'Failed to place order. Please review your details.');
     } finally {
       setLoading(false);
     }
@@ -69,7 +72,7 @@ export const CheckoutPage = () => {
         <ArrowLeft size={16} /> Return to Shopping Bag
       </Link>
 
-      <h1 style={{ fontSize: '1.85rem', fontWeight: 800, marginBottom: '2rem' }}>Complete Your Order</h1>
+      <h1 style={{ fontSize: '1.85rem', fontWeight: 800, marginBottom: '2rem' }}>Checkout & Payment</h1>
 
       {error && (
         <div style={{
@@ -87,7 +90,7 @@ export const CheckoutPage = () => {
       <form onSubmit={handlePlaceOrder} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2.5rem', alignItems: 'start' }}>
         {/* Shipping & Payment Form */}
         <div>
-          {/* Shipping Address */}
+          {/* Shipping Address in India */}
           <div style={{
             backgroundColor: '#ffffff',
             borderRadius: 'var(--radius-lg)',
@@ -95,12 +98,52 @@ export const CheckoutPage = () => {
             padding: '1.75rem',
             marginBottom: '1.5rem',
           }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.25rem' }}>1. Shipping Address</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.25rem' }}>1. Delivery Address (India)</h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={address.fullName}
+                    onChange={(e) => setAddress({ ...address, fullName: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border)',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                    10-Digit Mobile Number *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    pattern="[6-9][0-9]{9}"
+                    placeholder="98XXXXXXXX"
+                    value={address.phone}
+                    onChange={(e) => setAddress({ ...address, phone: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border)',
+                    }}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                  Street Address
+                  Flat / House / Street Address *
                 </label>
                 <input
                   type="text"
@@ -119,7 +162,7 @@ export const CheckoutPage = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                    City
+                    City *
                   </label>
                   <input
                     type="text"
@@ -137,7 +180,7 @@ export const CheckoutPage = () => {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                    State / Province
+                    State *
                   </label>
                   <input
                     type="text"
@@ -157,11 +200,13 @@ export const CheckoutPage = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                    Postal Code
+                    6-Digit PIN Code *
                   </label>
                   <input
                     type="text"
                     required
+                    pattern="[1-9][0-9]{5}"
+                    placeholder="400001"
                     value={address.postalCode}
                     onChange={(e) => setAddress({ ...address, postalCode: e.target.value })}
                     style={{
@@ -177,35 +222,31 @@ export const CheckoutPage = () => {
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
                     Country
                   </label>
-                  <select
-                    value={address.country}
-                    onChange={(e) => setAddress({ ...address, country: e.target.value })}
+                  <input
+                    type="text"
+                    disabled
+                    value="India"
                     style={{
                       width: '100%',
                       padding: '0.65rem',
                       borderRadius: 'var(--radius-sm)',
                       border: '1px solid var(--border)',
+                      backgroundColor: 'var(--bg-alt)',
                     }}
-                  >
-                    <option value="US">United States</option>
-                    <option value="CA">Canada</option>
-                    <option value="UK">United Kingdom</option>
-                    <option value="DE">Germany</option>
-                    <option value="AU">Australia</option>
-                  </select>
+                  />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Payment Method */}
+          {/* Payment Method Selector */}
           <div style={{
             backgroundColor: '#ffffff',
             borderRadius: 'var(--radius-lg)',
             border: '1px solid var(--border)',
             padding: '1.75rem',
           }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.25rem' }}>2. Payment Selection</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.25rem' }}>2. Payment Options</h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <label style={{
@@ -213,18 +254,18 @@ export const CheckoutPage = () => {
                 alignItems: 'center',
                 gap: '0.75rem',
                 padding: '0.85rem',
-                border: paymentMethod === 'credit_card' ? '2px solid var(--primary)' : '1px solid var(--border)',
+                border: paymentMethod === 'razorpay' ? '2px solid var(--primary)' : '1px solid var(--border)',
                 borderRadius: 'var(--radius-md)',
                 cursor: 'pointer',
               }}>
                 <input
                   type="radio"
                   name="payment"
-                  checked={paymentMethod === 'credit_card'}
-                  onChange={() => setPaymentMethod('credit_card')}
+                  checked={paymentMethod === 'razorpay'}
+                  onChange={() => setPaymentMethod('razorpay')}
                 />
                 <CreditCard size={18} color="var(--primary)" />
-                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Credit / Debit Card (Instant Approval)</span>
+                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Razorpay (Cards, UPI, Netbanking, Wallets)</span>
               </label>
 
               <label style={{
@@ -242,62 +283,10 @@ export const CheckoutPage = () => {
                   checked={paymentMethod === 'cod'}
                   onChange={() => setPaymentMethod('cod')}
                 />
-                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Cash on Delivery</span>
+                <QrCode size={18} color="#059669" />
+                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Cash on Delivery (COD)</span>
               </label>
             </div>
-
-            {paymentMethod === 'credit_card' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '1rem', backgroundColor: 'var(--bg-alt)', borderRadius: 'var(--radius-md)' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
-                    Card Number
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue="4242 •••• •••• 4242"
-                    style={{
-                      width: '100%',
-                      padding: '0.55rem',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid var(--border)',
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
-                      Expires (MM/YY)
-                    </label>
-                    <input
-                      type="text"
-                      defaultValue="12/28"
-                      style={{
-                        width: '100%',
-                        padding: '0.55rem',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--border)',
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
-                      CVC / CVV
-                    </label>
-                    <input
-                      type="text"
-                      defaultValue="888"
-                      style={{
-                        width: '100%',
-                        padding: '0.55rem',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--border)',
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -309,7 +298,7 @@ export const CheckoutPage = () => {
           padding: '1.75rem',
           boxShadow: 'var(--shadow-sm)',
         }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.25rem' }}>Review Items</h2>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.25rem' }}>Order Breakdown</h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.5rem', maxHeight: '240px', overflowY: 'auto' }}>
             {cartItems.map((item) => (
@@ -317,27 +306,33 @@ export const CheckoutPage = () => {
                 <span style={{ fontWeight: 600, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.quantity}x {item.title}
                 </span>
-                <span style={{ fontWeight: 700 }}>${(item.price * item.quantity).toFixed(2)}</span>
+                <span style={{ fontWeight: 700 }}>₹{(item.price * item.quantity).toLocaleString('en-IN')}</span>
               </div>
             ))}
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Items Subtotal</span>
+              <span>₹{subtotal.toLocaleString('en-IN')}</span>
+            </div>
+            {discountAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
+                <span>Coupon Applied</span>
+                <span>-₹{discountAmount.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Shipping (Express India)</span>
+              <span>{shipping === 0 ? 'FREE' : `₹${shipping.toLocaleString('en-IN')}`}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Shipping</span>
-              <span>{shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Tax (8%)</span>
-              <span>${tax.toFixed(2)}</span>
+              <span style={{ color: 'var(--text-muted)' }}>GST (18%)</span>
+              <span>₹{tax.toLocaleString('en-IN')}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border)' }}>
               <span>Total Payable</span>
-              <span>${total.toFixed(2)}</span>
+              <span>₹{total.toLocaleString('en-IN')}</span>
             </div>
           </div>
 
@@ -347,11 +342,11 @@ export const CheckoutPage = () => {
             className="btn btn-primary"
             style={{ width: '100%', padding: '0.85rem', fontSize: '1rem', marginBottom: '1rem' }}
           >
-            {loading ? 'Processing Transaction...' : `Pay $${total.toFixed(2)} Now`}
+            {loading ? 'Processing Order...' : `Confirm Order for ₹${total.toLocaleString('en-IN')}`}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            <Lock size={14} color="var(--success)" /> Guaranteed Safe & Encrypted Checkout
+            <Lock size={14} color="var(--success)" /> Verified Razorpay Payment Gateway
           </div>
         </div>
       </form>

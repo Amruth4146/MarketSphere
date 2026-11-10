@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, TrendingUp, Award, Layers } from 'lucide-react';
+import { ArrowRight, Sparkles, TrendingUp, Store } from 'lucide-react';
 import { productService } from '../services/productService.js';
 import { ProductCard } from '../components/ProductCard.jsx';
 
@@ -33,7 +33,6 @@ export const HomePage = () => {
     loadHomeData();
   }, []);
 
-  // Demo fallback products if server has not been seeded yet
   const displayProducts =
     featuredProducts.length > 0
       ? featuredProducts
@@ -42,11 +41,11 @@ export const HomePage = () => {
             _id: '1',
             title: 'Sony WH-1000XM5 Wireless Noise-Cancelling Headphones',
             slug: 'sony-wh-1000xm5-wireless-headphones',
-            price: 398.0,
-            discountPrice: 348.0,
+            price: 29990.0,
+            discountPrice: 26990.0,
             averageRating: 4.9,
-            reviewCount: 38,
-            categoryId: { name: 'Electronics' },
+            reviewCount: 42,
+            categoryId: { name: 'Electronics & Audio' },
             images: [
               'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
             ],
@@ -54,13 +53,13 @@ export const HomePage = () => {
           },
           {
             _id: '2',
-            title: 'Apple MacBook Air M3 15-inch 16GB RAM 512GB SSD',
+            title: 'Apple MacBook Air M3 15-inch (16GB RAM, 512GB SSD)',
             slug: 'apple-macbook-air-m3-15-inch',
-            price: 1499.0,
-            discountPrice: 1399.0,
+            price: 134900.0,
+            discountPrice: 124900.0,
             averageRating: 4.9,
-            reviewCount: 54,
-            categoryId: { name: 'Electronics' },
+            reviewCount: 58,
+            categoryId: { name: 'Electronics & Audio' },
             images: [
               'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80',
             ],
@@ -68,13 +67,13 @@ export const HomePage = () => {
           },
           {
             _id: '3',
-            title: 'Minimalist Mechanical Automatic Sapphire Wristwatch',
-            slug: 'minimalist-mechanical-automatic-watch',
-            price: 249.0,
-            discountPrice: 199.0,
+            title: 'Minimalist Automatic Mechanical Watch with Sapphire Crystal',
+            slug: 'minimalist-automatic-mechanical-watch',
+            price: 14999.0,
+            discountPrice: 11999.0,
             averageRating: 4.7,
-            reviewCount: 22,
-            categoryId: { name: 'Fashion' },
+            reviewCount: 26,
+            categoryId: { name: 'Fashion & Apparel' },
             images: [
               'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80',
             ],
@@ -82,10 +81,10 @@ export const HomePage = () => {
           },
           {
             _id: '4',
-            title: 'Ergonomic Mesh Executive Desk Chair with Lumbar Support',
-            slug: 'ergonomic-mesh-executive-desk-chair',
-            price: 329.0,
-            discountPrice: 289.0,
+            title: 'Ergonomic High-Back Executive Mesh Office Chair',
+            slug: 'ergonomic-high-back-mesh-office-chair',
+            price: 18999.0,
+            discountPrice: 15499.0,
             averageRating: 4.6,
             reviewCount: 19,
             categoryId: { name: 'Home & Living' },
@@ -124,7 +123,7 @@ export const HomePage = () => {
               border: '1px solid rgba(255, 255, 255, 0.2)',
             }}>
               <Sparkles size={16} color="#fbbf24" />
-              <span>Next-Generation Multi-Vendor Marketplace</span>
+              <span>India's Verified Multi-Vendor Marketplace</span>
             </div>
 
             <h1 style={{ fontSize: 'clamp(2.2rem, 5vw, 3.5rem)', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: '1.25rem' }}>
@@ -132,7 +131,7 @@ export const HomePage = () => {
             </h1>
 
             <p style={{ fontSize: '1.1rem', color: '#c7d2fe', lineHeight: 1.6, marginBottom: '2rem', maxWidth: '520px' }}>
-              Direct access to verified boutique brands, high-performance electronics, and curated designer products with built-in buyer protection.
+              Direct access to verified GST-registered merchants, authentic electronics, and designer lifestyle products with built-in buyer protection.
             </p>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
@@ -159,7 +158,7 @@ export const HomePage = () => {
                   fontSize: '1rem',
                 }}
               >
-                Become a Seller
+                <Store size={18} /> Become a Vendor
               </Link>
             </div>
           </div>
@@ -178,7 +177,7 @@ export const HomePage = () => {
             >
               <img
                 src="https://images.unsplash.com/photo-1498049794561-7780e7231661?w=900&auto=format&fit=crop&q=80"
-                alt="MarketSphere Showcase"
+                alt="MarketSphere India"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
@@ -186,12 +185,12 @@ export const HomePage = () => {
         </div>
       </section>
 
-      {/* Featured Categories Carousel / Grid */}
+      {/* Featured Categories */}
       <section className="container" style={{ padding: '4rem 1.5rem 2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem' }}>
           <div>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Popular Categories</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.925rem' }}>Browse high quality items grouped by taxonomy</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.925rem' }}>Browse high quality items grouped by category</p>
           </div>
           <Link to="/products" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)', fontWeight: 700, fontSize: '0.9rem' }}>
             View All <ArrowRight size={16} />
@@ -204,10 +203,10 @@ export const HomePage = () => {
           gap: '1.25rem',
         }}>
           {[
-            { name: 'Electronics', slug: 'electronics', icon: '🎧', count: '120+ Products' },
+            { name: 'Electronics & Audio', slug: 'electronics', icon: '🎧', count: '120+ Products' },
             { name: 'Fashion & Apparel', slug: 'fashion', icon: '👔', count: '240+ Products' },
             { name: 'Home & Living', slug: 'home-living', icon: '🛋️', count: '90+ Products' },
-            { name: 'Sports & Outdoors', slug: 'sports-outdoors', icon: '⛺', count: '80+ Products' },
+            { name: 'Sports & Fitness', slug: 'sports-fitness', icon: '⛺', count: '80+ Products' },
             { name: 'Books & Stationery', slug: 'books', icon: '📚', count: '150+ Products' },
           ].map((cat) => (
             <Link
@@ -240,7 +239,7 @@ export const HomePage = () => {
         </div>
       </section>
 
-      {/* Featured Products Section */}
+      {/* Featured Products */}
       <section className="container" style={{ padding: '3rem 1.5rem 4rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
           <div>

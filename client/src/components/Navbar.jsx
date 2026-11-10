@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
 export const Navbar = () => {
-  const { user, isAuthenticated, isSeller, logout } = useAuth();
+  const { user, isAuthenticated, isVendor, logout } = useAuth();
   const { itemsCount } = useCart();
   const [keyword, setKeyword] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -76,7 +76,7 @@ export const Navbar = () => {
         }}>
           <input
             type="text"
-            placeholder="Search products, brands, tech, apparel..."
+            placeholder="Search electronics, fashion, lifestyle (India)..."
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             style={{
@@ -221,9 +221,9 @@ export const Navbar = () => {
                     <Package size={16} /> My Orders
                   </Link>
 
-                  {isSeller && (
+                  {isVendor && (
                     <Link
-                      to="/seller/dashboard"
+                      to="/vendor/dashboard"
                       onClick={() => setMenuOpen(false)}
                       style={{
                         display: 'flex',
@@ -235,7 +235,7 @@ export const Navbar = () => {
                         color: 'var(--text-main)',
                       }}
                     >
-                      <Store size={16} /> Seller Portal
+                      <Store size={16} /> Vendor Portal
                     </Link>
                   )}
 

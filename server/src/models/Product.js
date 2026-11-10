@@ -18,10 +18,10 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please provide product description'],
     },
-    sellerId: {
+    vendorId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Product must belong to a seller'],
+      ref: 'User', // References vendor's User account
+      required: [true, 'Product must belong to a vendor'],
       index: true,
     },
     categoryId: {
@@ -32,7 +32,7 @@ const productSchema = new mongoose.Schema(
     },
     price: {
       type: Number,
-      required: [true, 'Please provide price'],
+      required: [true, 'Please provide price in INR (₹)'],
       min: [0, 'Price must be positive'],
     },
     discountPrice: {
@@ -101,9 +101,15 @@ const productSchema = new mongoose.Schema(
   }
 );
 
+// Virtual alias sellerId -> vendorId for backward compatibility
+productSchema.virtual('sellerId').get(function () {
+  return this.vendorId;
+});
+
 // Indexes for fast searching and filtering
 productSchema.index({ title: 'text', description: 'text', brand: 'text' });
 productSchema.index({ categoryId: 1, status: 1, price: 1 });
+productSchema.index({ vendorId: 1, status: 1 });
 productSchema.index({ status: 1, averageRating: -1 });
 
 // Auto-generate slug from title

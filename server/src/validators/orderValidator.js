@@ -27,3 +27,4 @@ export const createOrderValidator = [
     .notEmpty()
     .withMessage('Postal code is required'),
 ];
+

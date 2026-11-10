@@ -8,6 +8,7 @@ export const authService = {
     });
     if (res.data?.token) {
       localStorage.setItem('marketsphere_token', res.data.token);
+      localStorage.setItem('marketsphere_refresh_token', res.data.refreshToken);
       localStorage.setItem('marketsphere_user', JSON.stringify(res.data.user));
     }
     return res.data;
@@ -20,7 +21,24 @@ export const authService = {
     });
     if (res.data?.token) {
       localStorage.setItem('marketsphere_token', res.data.token);
+      localStorage.setItem('marketsphere_refresh_token', res.data.refreshToken);
       localStorage.setItem('marketsphere_user', JSON.stringify(res.data.user));
+    }
+    return res.data;
+  },
+
+  refreshToken: async () => {
+    const refreshToken = localStorage.getItem('marketsphere_refresh_token');
+    if (!refreshToken) throw new Error('No refresh token');
+
+    const res = await request('/auth/refresh-token', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (res.data?.token) {
+      localStorage.setItem('marketsphere_token', res.data.token);
+      localStorage.setItem('marketsphere_refresh_token', res.data.refreshToken);
     }
     return res.data;
   },
@@ -38,8 +56,12 @@ export const authService = {
     return res.data?.user;
   },
 
-  logout: () => {
+  logout: async () => {
+    try {
+      await request('/auth/logout', { method: 'POST' });
+    } catch (e) {}
     localStorage.removeItem('marketsphere_token');
+    localStorage.removeItem('marketsphere_refresh_token');
     localStorage.removeItem('marketsphere_user');
   },
 

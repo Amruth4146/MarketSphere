@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Filter, SlidersHorizontal, RotateCcw, Search } from 'lucide-react';
+import { Filter, RotateCcw, Search } from 'lucide-react';
 import { productService } from '../services/productService.js';
 import { ProductCard } from '../components/ProductCard.jsx';
 
@@ -11,7 +11,6 @@ export const ProductsPage = () => {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
 
-  // Form states
   const activeCategory = searchParams.get('category') || '';
   const keyword = searchParams.get('keyword') || '';
   const sort = searchParams.get('sort') || 'newest';
@@ -199,16 +198,16 @@ export const ProductsPage = () => {
             </div>
           </div>
 
-          {/* Price Range */}
+          {/* Price Range in INR */}
           <div style={{ marginBottom: '1.75rem' }}>
             <div style={{ fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-              Price Range ($)
+              Price Range (₹)
             </div>
             <form onSubmit={handleApplyPrice} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <input
                   type="number"
-                  placeholder="Min"
+                  placeholder="Min ₹"
                   value={priceInput.min}
                   onChange={(e) => setPriceInput({ ...priceInput, min: e.target.value })}
                   style={{
@@ -222,7 +221,7 @@ export const ProductsPage = () => {
                 <span style={{ color: 'var(--text-muted)' }}>-</span>
                 <input
                   type="number"
-                  placeholder="Max"
+                  placeholder="Max ₹"
                   value={priceInput.max}
                   onChange={(e) => setPriceInput({ ...priceInput, max: e.target.value })}
                   style={{
@@ -235,7 +234,7 @@ export const ProductsPage = () => {
                 />
               </div>
               <button type="submit" className="btn btn-secondary" style={{ width: '100%', padding: '0.45rem' }}>
-                Apply Price
+                Apply Range
               </button>
             </form>
           </div>

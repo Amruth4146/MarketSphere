@@ -31,7 +31,7 @@ export const productService = {
   },
 
   addReview: async (productId, reviewData) => {
-    const res = await request(`/products/${productId}/reviews`, {
+    const res = await request(`/reviews/product/${productId}`, {
       method: 'POST',
       body: JSON.stringify(reviewData),
     });
@@ -40,6 +40,14 @@ export const productService = {
 
   getCategories: async () => {
     const res = await request('/categories');
+    return res.data;
+  },
+
+  validateCoupon: async (code, orderSubtotal) => {
+    const res = await request('/coupons/validate', {
+      method: 'POST',
+      body: JSON.stringify({ code, orderSubtotal }),
+    });
     return res.data;
   },
 };

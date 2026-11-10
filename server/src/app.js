@@ -7,9 +7,17 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 // Route imports
 import authRoutes from './routes/authRoutes.js';
-import categoryRoutes from './routes/categoryRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import vendorRoutes from './routes/vendorRoutes.js';
 import productRoutes from './routes/productRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
+import cartRoutes from './routes/cartRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import reviewRoutes from './routes/reviewRoutes.js';
+import couponRoutes from './routes/couponRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const app = express();
 
@@ -32,26 +40,44 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv,
+    currency: config.currency.code,
   });
 });
 
-// API Routes
+// Mounted API Groups
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/categories', categoryRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/vendors', vendorRoutes);
 app.use('/api/v1/products', productRoutes);
+app.use('/api/v1/categories', categoryRoutes);
+app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/reviews', reviewRoutes);
+app.use('/api/v1/coupons', couponRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 // API Root endpoint
 app.get('/api/v1', (req, res) => {
   res.status(200).json({
     name: 'MarketSphere API',
     version: '1.0.0',
+    market: 'India (INR ₹)',
     status: 'operational',
     endpoints: {
       auth: '/api/v1/auth',
-      categories: '/api/v1/categories',
+      users: '/api/v1/users',
+      vendors: '/api/v1/vendors',
       products: '/api/v1/products',
+      categories: '/api/v1/categories',
+      cart: '/api/v1/cart',
       orders: '/api/v1/orders',
+      payments: '/api/v1/payments',
+      reviews: '/api/v1/reviews',
+      coupons: '/api/v1/coupons',
+      admin: '/api/v1/admin',
+      notifications: '/api/v1/notifications',
       health: '/health',
     },
   });

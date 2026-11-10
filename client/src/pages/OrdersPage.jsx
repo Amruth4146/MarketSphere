@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, Calendar, Clock, ChevronRight, ShoppingBag } from 'lucide-react';
+import { Package, Calendar } from 'lucide-react';
 import { orderService } from '../services/orderService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -63,9 +63,9 @@ export const OrdersPage = () => {
           textAlign: 'center',
         }}>
           <Package size={44} style={{ color: 'var(--text-light)', marginBottom: '1rem' }} />
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>No orders yet</h3>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>No orders placed yet</h3>
           <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-            When you complete checkout on MarketSphere, your order records will show here.
+            When you complete checkout on MarketSphere, your verified orders and merchant tracking codes will appear here.
           </p>
           <Link to="/products" className="btn btn-primary">
             Explore Marketplace
@@ -106,15 +106,15 @@ export const OrdersPage = () => {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                   <Calendar size={15} />
-                  <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                  <span>{new Date(order.createdAt).toLocaleDateString('en-IN')}</span>
                 </div>
 
                 <div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
-                    Total
+                    Total (INR)
                   </span>
                   <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)' }}>
-                    ${order.totalPrice?.toFixed(2)}
+                    ₹{order.totalPrice?.toLocaleString('en-IN')}
                   </div>
                 </div>
 
@@ -146,7 +146,7 @@ export const OrdersPage = () => {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: '0.925rem' }}>{item.title}</div>
                       <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                        Quantity: {item.quantity} × ${item.price?.toFixed(2)}
+                        Qty: {item.quantity} × ₹{item.price?.toLocaleString('en-IN')}
                       </div>
                     </div>
                   </div>

@@ -34,3 +34,4 @@ export const productValidator = [
     .isArray({ min: 1 })
     .withMessage('At least one product image is required'),
 ];
+

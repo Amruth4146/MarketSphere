@@ -8,8 +8,6 @@ import {
   Check,
   ShoppingCart,
   Zap,
-  Store,
-  User as UserIcon,
 } from 'lucide-react';
 import { productService } from '../services/productService.js';
 import { useCart } from '../context/CartContext.jsx';
@@ -19,7 +17,7 @@ export const ProductDetailPage = () => {
   const { identifier } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const [productData, setProductData] = useState(null);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -93,9 +91,8 @@ export const ProductDetailPage = () => {
         rating: reviewRating,
         comment: reviewComment,
       });
-      setReviewMessage('Thank you! Your review was recorded.');
+      setReviewMessage('Thank you! Your verified review has been recorded.');
       setReviewComment('');
-      // Refresh details
       const refreshed = await productService.getProduct(identifier);
       setProductData(refreshed);
     } catch (err) {
@@ -166,14 +163,14 @@ export const ProductDetailPage = () => {
             {product.title}
           </h1>
 
-          {/* Rating & Reviews */}
+          {/* Rating & Stock */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', color: '#f59e0b', fontWeight: 700 }}>
               <Star size={16} fill="#f59e0b" color="#f59e0b" />
               <span>{product.averageRating?.toFixed(1) || '0.0'}</span>
             </div>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              ({product.reviewCount || 0} customer reviews)
+              ({product.reviewCount || 0} reviews)
             </span>
             <span style={{ color: 'var(--border)' }}>|</span>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: product.stock > 0 ? 'var(--success)' : 'var(--danger)' }}>
@@ -181,7 +178,7 @@ export const ProductDetailPage = () => {
             </span>
           </div>
 
-          {/* Pricing */}
+          {/* Pricing in INR */}
           <div style={{
             backgroundColor: '#ffffff',
             padding: '1.25rem',
@@ -191,20 +188,22 @@ export const ProductDetailPage = () => {
           }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
               <span style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                ${activePrice.toFixed(2)}
+                ₹{activePrice.toLocaleString('en-IN')}
               </span>
               {hasDiscount && (
                 <>
                   <span style={{ fontSize: '1.1rem', color: 'var(--text-light)', textDecoration: 'line-through' }}>
-                    ${product.price.toFixed(2)}
+                    ₹{product.price.toLocaleString('en-IN')}
                   </span>
                   <span className="badge badge-discount">Save {discountPercent}%</span>
                 </>
               )}
             </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+              Inclusive of all applicable Indian taxes (GST)
+            </div>
           </div>
 
-          {/* Description */}
           <p style={{ color: 'var(--text-main)', lineHeight: '1.7', fontSize: '0.95rem', marginBottom: '1.75rem' }}>
             {product.description}
           </p>
@@ -271,29 +270,28 @@ export const ProductDetailPage = () => {
             border: '1px solid var(--border)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.825rem', fontWeight: 600 }}>
-              <Truck size={16} color="var(--primary)" /> Free shipping over $50
+              <Truck size={16} color="var(--primary)" /> Free shipping over ₹999
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.825rem', fontWeight: 600 }}>
-              <ShieldCheck size={16} color="var(--success)" /> 1-Year Guarantee
+              <ShieldCheck size={16} color="var(--success)" /> GST Verified Seller
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.825rem', fontWeight: 600 }}>
-              <RotateCcw size={16} color="var(--secondary)" /> 30-Day Returns
+              <RotateCcw size={16} color="var(--secondary)" /> 7-Day Easy Returns
             </div>
           </div>
         </div>
       </div>
 
-      {/* Reviews & Feedback Section */}
+      {/* Reviews Section */}
       <section style={{ marginTop: '4rem', paddingTop: '3rem', borderTop: '1px solid var(--border)' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '1.5rem' }}>
           Customer Reviews ({reviews.length})
         </h2>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2.5rem' }}>
-          {/* Reviews List */}
           <div>
             {reviews.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)' }}>No reviews yet. Be the first to review this product!</p>
+              <p style={{ color: 'var(--text-muted)' }}>No customer reviews yet. Be the first to share your experience!</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 {reviews.map((r, i) => (
@@ -320,9 +318,9 @@ export const ProductDetailPage = () => {
                           fontWeight: 700,
                           fontSize: '0.8rem',
                         }}>
-                          {r.buyerId?.name ? r.buyerId.name[0] : 'U'}
+                          {r.customerId?.name ? r.customerId.name[0] : 'C'}
                         </div>
-                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{r.buyerId?.name || 'Verified Buyer'}</span>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{r.customerId?.name || 'Verified Customer'}</span>
                       </div>
                       <div style={{ display: 'flex', gap: '0.1rem', color: '#f59e0b' }}>
                         {[...Array(5)].map((_, idx) => (
@@ -350,7 +348,7 @@ export const ProductDetailPage = () => {
             padding: '1.5rem',
             alignSelf: 'start',
           }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.75rem' }}>Write a Review</h3>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.75rem' }}>Rate this Product</h3>
             {isAuthenticated ? (
               <form onSubmit={handleReviewSubmit}>
                 {reviewMessage && (
@@ -397,7 +395,7 @@ export const ProductDetailPage = () => {
                     rows={4}
                     value={reviewComment}
                     onChange={(e) => setReviewComment(e.target.value)}
-                    placeholder="Describe product quality, shipping experience, and durability..."
+                    placeholder="Describe product quality, delivery, and performance..."
                     style={{
                       width: '100%',
                       padding: '0.6rem',
@@ -416,16 +414,16 @@ export const ProductDetailPage = () => {
                   className="btn btn-primary"
                   style={{ width: '100%' }}
                 >
-                  {reviewSubmitting ? 'Posting Review...' : 'Submit Review'}
+                  {reviewSubmitting ? 'Submitting...' : 'Post Verified Review'}
                 </button>
               </form>
             ) : (
               <div>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  Please sign in to share your purchase review.
+                  Please sign in to write a customer review.
                 </p>
                 <Link to="/login" className="btn btn-outline" style={{ width: '100%' }}>
-                  Sign In to Review
+                  Sign In
                 </Link>
               </div>
             )}

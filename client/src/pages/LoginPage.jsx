@@ -134,10 +134,10 @@ export const LoginPage = () => {
           </button>
         </form>
 
-        {/* Demo Accounts Quick-Fill Section */}
+        {/* Specification Roles Demo Fill */}
         <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px dashed var(--border)' }}>
           <div style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.75rem', textAlign: 'center' }}>
-            Quick Demo Login (One-Click)
+            Specification Role Demo Logins
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
             <button
@@ -146,15 +146,15 @@ export const LoginPage = () => {
               className="btn btn-secondary"
               style={{ fontSize: '0.75rem', padding: '0.4rem 0.5rem' }}
             >
-              Buyer Demo
+              Customer
             </button>
             <button
               type="button"
-              onClick={() => handleDemoFill('seller@apextech.com', 'Password123!')}
+              onClick={() => handleDemoFill('vendor@apextech.com', 'Password123!')}
               className="btn btn-secondary"
               style={{ fontSize: '0.75rem', padding: '0.4rem 0.5rem' }}
             >
-              Seller Demo
+              Vendor
             </button>
             <button
               type="button"
@@ -162,7 +162,7 @@ export const LoginPage = () => {
               className="btn btn-secondary"
               style={{ fontSize: '0.75rem', padding: '0.4rem 0.5rem' }}
             >
-              Admin Demo
+              Admin
             </button>
           </div>
         </div>

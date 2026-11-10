@@ -1,9 +1,14 @@
 import { User } from '../models/User.js';
-import { generateAccessToken, generateRefreshToken } from '../utils/generateToken.js';
+import { Vendor } from '../models/Vendor.js';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from '../utils/generateToken.js';
 
 export const register = async (req, res, next) => {
   try {
-    const { name, email, password, role, businessName } = req.body;
+    const { name, email, password, role = 'customer', businessName, phone } = req.body;
 
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -13,26 +18,42 @@ export const register = async (req, res, next) => {
       });
     }
 
-    const userData = {
+    const assignedRole = role === 'vendor' ? 'vendor' : 'customer';
+
+    const user = await User.create({
       name,
       email,
       password,
-      role: role || 'buyer',
-    };
+      role: assignedRole,
+      phone: phone || '',
+    });
 
-    if (role === 'seller' && businessName) {
-      userData.sellerProfile = {
-        businessName,
-        rating: 0,
-        ratingCount: 0,
-        isVerified: false,
-      };
+    let vendorRecord = null;
+    if (assignedRole === 'vendor') {
+      const storeName = businessName || `${name}'s Store`;
+      const storeSlug = storeName
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '') + `-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      vendorRecord = await Vendor.create({
+        userId: user._id,
+        businessName: storeName,
+        storeSlug,
+        status: 'approved',
+      });
+
+      user.vendorId = vendorRecord._id;
+      await user.save();
     }
-
-    const user = await User.create(userData);
 
     const token = generateAccessToken(user._id, user.role);
     const refreshToken = generateRefreshToken(user._id);
+
+    // Save refresh token to user
+    user.refreshToken = refreshToken;
+    await user.save();
 
     res.status(201).json({
       success: true,
@@ -43,8 +64,10 @@ export const register = async (req, res, next) => {
           name: user.name,
           email: user.email,
           role: user.role,
+          phone: user.phone,
           avatar: user.avatar,
-          sellerProfile: user.sellerProfile,
+          vendorId: user.vendorId,
+          vendor: vendorRecord,
         },
         token,
         refreshToken,
@@ -78,12 +101,20 @@ export const login = async (req, res, next) => {
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
-        message: 'Account has been deactivated',
+        message: 'Your account has been deactivated. Please contact support.',
       });
+    }
+
+    let vendor = null;
+    if (user.role === 'vendor' && user.vendorId) {
+      vendor = await Vendor.findById(user.vendorId);
     }
 
     const token = generateAccessToken(user._id, user.role);
     const refreshToken = generateRefreshToken(user._id);
+
+    user.refreshToken = refreshToken;
+    await user.save();
 
     res.status(200).json({
       success: true,
@@ -94,8 +125,10 @@ export const login = async (req, res, next) => {
           name: user.name,
           email: user.email,
           role: user.role,
+          phone: user.phone,
           avatar: user.avatar,
-          sellerProfile: user.sellerProfile,
+          vendorId: user.vendorId,
+          vendor,
         },
         token,
         refreshToken,
@@ -106,13 +139,96 @@ export const login = async (req, res, next) => {
   }
 };
 
-export const getMe = async (req, res, next) => {
+export const refreshToken = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const { refreshToken: incomingToken } = req.body;
+
+    if (!incomingToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Refresh token is required',
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = verifyRefreshToken(incomingToken);
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired refresh token',
+      });
+    }
+
+    const user = await User.findById(decoded.id).select('+refreshToken');
+    if (!user || user.refreshToken !== incomingToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'Refresh token has been revoked or is no longer valid',
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is deactivated',
+      });
+    }
+
+    const newAccessToken = generateAccessToken(user._id, user.role);
+    const newRefreshToken = generateRefreshToken(user._id);
+
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
     res.status(200).json({
       success: true,
       data: {
-        user,
+        token: newAccessToken,
+        refreshToken: newRefreshToken,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (req, res, next) => {
+  try {
+    if (req.user) {
+      await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } });
+    }
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMe = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    let vendor = null;
+    if (user.role === 'vendor' && user.vendorId) {
+      vendor = await Vendor.findById(user.vendorId);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          phone: user.phone,
+          avatar: user.avatar,
+          vendorId: user.vendorId,
+          vendor,
+          wishlist: user.wishlist,
+        },
       },
     });
   } catch (error) {
@@ -122,9 +238,9 @@ export const getMe = async (req, res, next) => {
 
 export const updateProfile = async (req, res, next) => {
   try {
-    const { name, phone, avatar, addresses, businessName } = req.body;
-
+    const { name, phone, avatar } = req.body;
     const user = await User.findById(req.user._id);
+
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -132,19 +248,53 @@ export const updateProfile = async (req, res, next) => {
     if (name) user.name = name;
     if (phone) user.phone = phone;
     if (avatar) user.avatar = avatar;
-    if (addresses) user.addresses = addresses;
-    if (businessName && user.role === 'seller') {
-      user.sellerProfile = { ...user.sellerProfile, businessName };
-    }
 
     await user.save();
 
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
-      data: {
-        user,
-      },
+      data: { user },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getWishlist = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).populate({
+      path: 'wishlist',
+      populate: { path: 'categoryId', select: 'name slug' },
+    });
+    res.status(200).json({
+      success: true,
+      data: user.wishlist || [],
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const toggleWishlist = async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+    const user = await User.findById(req.user._id);
+
+    const isFav = user.wishlist.some((id) => id.toString() === productId);
+    if (isFav) {
+      user.wishlist = user.wishlist.filter((id) => id.toString() !== productId);
+    } else {
+      user.wishlist.push(productId);
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: isFav ? 'Removed from wishlist' : 'Added to wishlist',
+      isWishlisted: !isFav,
+      wishlist: user.wishlist,
     });
   } catch (error) {
     next(error);

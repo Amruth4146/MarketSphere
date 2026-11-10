@@ -1,115 +1,88 @@
-# MarketSphere System Architecture
+# MarketSphere System Architecture (Indian E-Commerce Specification)
 
 ## 1. System Overview
 
-**MarketSphere** is an enterprise-grade, scalable multi-vendor e-commerce marketplace platform. It facilitates seamless interactions between buyers, sellers, and platform administrators, offering comprehensive product discovery, transaction handling, inventory management, and analytics.
+**MarketSphere** is an enterprise-grade multi-vendor e-commerce marketplace platform tailored for the Indian retail ecosystem. The platform enforces strict Role-Based Access Control (RBAC) across three primary actors:
+- **`customer`**: Browses catalog, adds products to cart/wishlist, places parent orders, tracks delivery, and writes verified reviews.
+- **`vendor`**: Manages GST-registered store profile, lists products in INR (₹), fulfills vendor-specific suborders, and tracks payouts.
+- **`admin`**: Moderates platform accounts, oversees multi-vendor commissions, approves vendor stores, and manages catalog categories.
 
-The system is architected around a decoupled client-server model, utilizing a distributed data layer with specialized databases for persistence (MongoDB), distributed caching (Redis), and full-text search indexing (Elasticsearch).
+The platform architecture implements a parent-order / vendor-suborder split, ensuring multi-merchant transactions are cleanly segmented into separate fulfillment streams with automated platform commission and GST calculations.
 
 ---
 
 ## 2. High-Level Architecture Diagram
 
 ```
-+-------------------------------------------------------------+
-|                      Client Layer                           |
-|              (React 19 + Vite SPA, Tailwind CSS)            |
-+------------------------------+------------------------------+
-                               |
-                               | HTTPS / REST JSON APIs
-                               v
-+-------------------------------------------------------------+
-|                     API Gateway / Server                     |
-|           (Node.js + Express.js - Modular Monolith)         |
-|  - Auth Middleware (JWT + RBAC)                             |
-|  - Request Validation (Express-Validator)                   |
-|  - Rate Limiting & Helmet Security Headers                  |
-+----------+-------------------+-------------------+----------+
-           |                   |                   |
-           v                   v                   v
-+--------------------+ +---------------+ +--------------------+
-|   Database Layer   | |  Cache Layer  | |    Search Layer    |
-|   (MongoDB 7.0)    | |  (Redis 7.0)  | |(Elasticsearch 8.17)|
-| - Users & Profiles | | - Session     | | - Product Catalog  |
-| - Orders & Carts   | | - Cache Data  | | - Faceted Search   |
-| - Transactions     | | - Rate Limits | | - Autocomplete     |
-+--------------------+ +---------------+ +--------------------+
++-------------------------------------------------------------------+
+|                        Client Layer                               |
+|            (React 19 + Vite SPA, Tailwind CSS / Custom CSS)        |
+|  - Role-Aware Navigation (Customer / Vendor / Admin)              |
+|  - Currency Formatter (INR ₹) & Dynamic Cart Calculations         |
++---------------------------------+---------------------------------+
+                                  |
+                                  | HTTPS / REST JSON APIs
+                                  v
++-------------------------------------------------------------------+
+|                       API Gateway / Server                        |
+|            (Node.js + Express.js - Modular Monolith)              |
+|  - Auth Middleware (JWT Bearer Token + DB Role Verification)      |
+|  - Request Validation (Express-Validator)                         |
+|  - Centralized Error & Exception Handler                          |
+|  - Currency Engine (INR, 18% GST, Configurable Shipping)          |
++-----------+---------------------+---------------------+-----------+
+            |                     |                     |
+            v                     v                     v
++---------------------+ +-----------------+ +-----------------------+
+|   Database Layer    | |   Cache Layer   | |     Search Layer      |
+|    (MongoDB 7.0)    | |  (Redis 7.0)    | | (Elasticsearch 8.17)  |
+| - Users, Vendors    | | - Category &    | | - Fuzzy Search        |
+| - Products, Orders  | |   Product Read  | | - Catalog Aggregation |
+| - Vendor Orders     | |   Cache         | | - Fallback to MongoDB |
+| - Payments, Coupons | |                 | |                       |
+| - Commissions       | |                 | |                       |
++---------------------+ +-----------------+ +-----------------------+
+            |                                           |
+            v                                           v
++-----------------------------------+   +---------------------------+
+|          Payment Gateway          |   |       Cloud Storage       |
+|    (Razorpay - UPI/Cards/Net)     |   |    (AWS S3 - ap-south-1)  |
+|  - HMAC SHA256 Signature Verify   |   |  - Media & Product Assets |
++-----------------------------------+   +---------------------------+
 ```
 
 ---
 
-## 3. Technology Stack
+## 3. Technology Stack & External Services Status
 
-| Layer | Technology | Version | Purpose |
+| Layer | Service / Technology | Status | Integration Scope |
 | :--- | :--- | :--- | :--- |
-| **Frontend** | React | 19.x | Declarative UI component tree |
-| **Frontend Tooling** | Vite | 6.x | Fast HMR development and optimized production bundling |
-| **Backend** | Node.js + Express | 24.x / 4.21.x | Robust HTTP server, routing, and controller execution |
-| **Primary Database** | MongoDB | 7.0 | Document store for ACID transactional entities |
-| **ODM** | Mongoose | 8.x | Schema modeling, validation, and middleware hooks |
-| **In-Memory Cache** | Redis | 7.0 (Alpine) | High-speed cache, session management, and rate limiting |
-| **Search Engine** | Elasticsearch | 8.17.x | Full-text search, typo-tolerance, and catalog aggregation |
-| **Containerization** | Docker + Compose | 3.8 Spec | Unified local and staging container orchestration |
+| **Runtime & Framework** | Node.js v24 + Express 4.21 | **Active Integration** | Full server implementation with 12 modular route controllers |
+| **Client** | React 19 + Vite 6 | **Active Integration** | Full SPA with Auth, Cart, Catalog, Checkout, and Dashboards |
+| **Primary Database** | MongoDB 7.0 + Mongoose 8.10 | **Active Integration** | 12 dedicated models with indexes, hooks, and virtuals |
+| **Caching Layer** | Redis 7.0 (Alpine) + ioredis | **Active Integration** | Cache-aside pattern for catalog read paths with silent fallback |
+| **Search Engine** | Elasticsearch 8.17.0 | **Active Integration** | `products_index` mapping, fuzzy multi-match query with Mongo fallback |
+| **Payment Gateway** | Razorpay SDK | **Configured & Scaffolded** | Order creation and HMAC SHA256 signature verification handler |
+| **Object Storage** | AWS S3 (`ap-south-1`) | **Configured & Scaffolded** | Mumbai region storage configuration stub with presigned contract |
 
 ---
 
-## 4. Frontend Architecture (`client/`)
+## 4. Multi-Vendor Suborder Architecture
 
-The frontend application follows a feature-modular component structure:
-
-```
-client/src/
-├── assets/         # Static visual assets (icons, illustrations, brand media)
-├── components/     # Reusable atomic & composite UI components (Button, Modal, Input)
-├── context/        # React Context providers (AuthContext, CartContext, ThemeContext)
-├── hooks/          # Custom reusable React hooks (useAuth, useDebounce, useFetch)
-├── layouts/        # Page layout templates (MainLayout, AuthLayout, DashboardLayout)
-├── pages/          # Route view components (HomePage, ProductDetails, Checkout)
-├── services/       # API client abstractions and Axios/Fetch interceptors
-└── utils/          # Pure helper utilities (formatters, validators, constants)
-```
-
-### Key Principles:
-- **Separation of Concerns:** Business logic resides inside custom hooks and services; UI components remain presentation-focused.
-- **State Management:** Local state handles UI transitions; Context API handles global states (user auth, cart session); Server state handles API caching.
-- **Responsive Layouts:** Mobile-first responsive grids and components.
+When a customer checks out with items from multiple vendors:
+1. **Parent Order (`Order`)**: Contains the overall order summary, aggregate totals, customer reference, shipping address, and payment status.
+2. **Vendor Suborders (`VendorOrder`)**: Automatically partitioned per vendor. Each suborder holds vendor items, vendor subtotal, shipping allocation, and delivery tracking.
+3. **Platform Commission (`Commission`)**: Records platform take rate (e.g. 10%), applicable Indian GST (18% on platform commission), and net vendor payout (`grossAmount - commissionAmount - gstOnCommission`).
 
 ---
 
-## 5. Backend Architecture (`server/`)
+## 5. Security & Authentication Architecture
 
-The server is built with a layered, modular architecture:
-
-```
-server/src/
-├── config/         # Environment variables, database, redis, and ES clients
-├── controllers/    # Request handling, response formatting, HTTP status codes
-├── models/         # Mongoose entity schemas and model definitions
-├── routes/         # Express endpoint definitions mapped to controllers
-├── middleware/     # Auth, RBAC, error handling, rate limiting, logging
-├── services/       # Core business logic and external integrations
-├── utils/          # Reusable helper functions and custom Error classes
-└── validators/     # Request payload validation schemas
-```
-
-### Request Lifecycle:
-1. **Inbound HTTP Request** arrives at `server.js`.
-2. Passed to Express `app.js` through global middleware (`helmet`, `cors`, `morgan`, `express.json`).
-3. Routed through endpoint router (`/api/v1/*`).
-4. **Validation Middleware** verifies query/body parameters.
-5. **Auth Middleware** extracts and verifies Bearer JWT, attaching `req.user`.
-6. **Controller** delegates business operations to relevant **Service**.
-7. **Service** interacts with MongoDB, Redis, or Elasticsearch.
-8. Standardized JSON response envelope returned to client.
-9. Any uncaught exceptions are caught by the centralized `errorHandler`.
-
----
-
-## 6. Security Architecture
-
-1. **Credentials Isolation:** No hardcoded secrets. All configurations are loaded via environment variables validated by `config/env.js`.
-2. **Authentication:** Stateless JSON Web Tokens (Access Tokens with short expiry + Refresh Tokens with rotation).
-3. **Authorization:** Role-Based Access Control (`buyer`, `seller`, `admin`).
-4. **Transport Protection:** Helmet middleware sets HTTP security headers (HSTS, CSP, X-Frame-Options).
-5. **Data Sanitization:** Strict payload schemas prevent injection attacks.
-
+1. **Role Enforcement:** Authenticated roles (`customer`, `vendor`, `admin`) are strictly verified from the database record during token verification. Client-supplied role claims are never trusted.
+2. **Token Strategy:**
+   - **Access Token:** Short-lived JWT (15 minutes) signed via `HS256`.
+   - **Refresh Token:** Long-lived JWT (7 days) stored on backend User document.
+   - **Silent Refresh:** Automatic token refresh interceptor in client service layer.
+   - **Revocation:** Explicit logout revokes refresh token on backend.
+3. **Password Security:** Salt rounds 10+ using `bcryptjs` with pre-save hashing.
+4. **Transport Hardening:** `helmet` security headers, CORS origin whitelisting, and parameter validation.

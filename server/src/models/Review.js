@@ -8,7 +8,7 @@ const reviewSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    buyerId: {
+    customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
@@ -29,11 +29,18 @@ const reviewSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// Prevent user from submitting multiple reviews for same product
-reviewSchema.index({ productId: 1, buyerId: 1 }, { unique: true });
+// Virtual alias buyerId -> customerId
+reviewSchema.virtual('buyerId').get(function () {
+  return this.customerId;
+});
+
+// Prevent customer from submitting multiple reviews for same product
+reviewSchema.index({ productId: 1, customerId: 1 }, { unique: true });
 
 // Static method to recalculate product rating average
 reviewSchema.statics.calculateAverageRating = async function (productId) {

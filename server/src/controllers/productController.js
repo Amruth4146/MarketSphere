@@ -1,7 +1,8 @@
 import { Product } from '../models/Product.js';
 import { Review } from '../models/Review.js';
 import { Category } from '../models/Category.js';
-import { getRedisClient } from '../config/redis.js';
+import { cacheService } from '../services/cacheService.js';
+import { searchService } from '../services/searchService.js';
 
 export const getProducts = async (req, res, next) => {
   try {
@@ -17,9 +18,42 @@ export const getProducts = async (req, res, next) => {
       featured,
     } = req.query;
 
+    // Check Elasticsearch if keyword is present
+    if (keyword) {
+      const esResult = await searchService.search(keyword, {
+        minPrice,
+        maxPrice,
+        sort,
+        page,
+        limit,
+      });
+
+      if (esResult) {
+        // Hydrate from DB for full category & vendor info
+        const ids = esResult.products.map((p) => p.id);
+        const products = await Product.find({ _id: { $in: ids } })
+          .populate('categoryId', 'name slug')
+          .populate('vendorId', 'name avatar');
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            products,
+            pagination: {
+              total: esResult.total,
+              page: parseInt(page, 10),
+              pages: Math.ceil(esResult.total / parseInt(limit, 10)),
+              limit: parseInt(limit, 10),
+            },
+            searchEngine: 'elasticsearch',
+          },
+        });
+      }
+    }
+
+    // Standard MongoDB query fallback
     const query = { status: 'published' };
 
-    // Text search or keyword regex
     if (keyword) {
       query.$or = [
         { title: { $regex: keyword, $options: 'i' } },
@@ -28,9 +62,7 @@ export const getProducts = async (req, res, next) => {
       ];
     }
 
-    // Category filter
     if (category) {
-      // Find category by slug or ID
       const cat = await Category.findOne({
         $or: [
           { slug: category },
@@ -42,24 +74,20 @@ export const getProducts = async (req, res, next) => {
       }
     }
 
-    // Price range filter
     if (minPrice !== undefined || maxPrice !== undefined) {
       query.price = {};
       if (minPrice !== undefined) query.price.$gte = Number(minPrice);
       if (maxPrice !== undefined) query.price.$lte = Number(maxPrice);
     }
 
-    // Rating filter
     if (minRating !== undefined) {
       query.averageRating = { $gte: Number(minRating) };
     }
 
-    // Featured filter
     if (featured === 'true') {
       query.isFeatured = true;
     }
 
-    // Sorting
     let sortOption = { createdAt: -1 };
     if (sort === 'price_asc') sortOption = { price: 1 };
     else if (sort === 'price_desc') sortOption = { price: -1 };
@@ -73,7 +101,7 @@ export const getProducts = async (req, res, next) => {
     const [products, total] = await Promise.all([
       Product.find(query)
         .populate('categoryId', 'name slug')
-        .populate('sellerId', 'name sellerProfile')
+        .populate('vendorId', 'name avatar')
         .sort(sortOption)
         .skip(skip)
         .limit(limitNum)
@@ -91,6 +119,7 @@ export const getProducts = async (req, res, next) => {
           pages: Math.ceil(total / limitNum),
           limit: limitNum,
         },
+        searchEngine: 'mongodb',
       },
     });
   } catch (error) {
@@ -100,29 +129,23 @@ export const getProducts = async (req, res, next) => {
 
 export const getFeaturedProducts = async (req, res, next) => {
   try {
-    const redis = getRedisClient();
     const cacheKey = 'products:featured';
-
-    try {
-      const cached = await redis?.get(cacheKey);
-      if (cached) {
-        return res.status(200).json({
-          success: true,
-          data: JSON.parse(cached),
-          source: 'cache',
-        });
-      }
-    } catch (e) {}
+    const cached = await cacheService.get(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        data: cached,
+        source: 'cache',
+      });
+    }
 
     const products = await Product.find({ status: 'published', isFeatured: true })
       .populate('categoryId', 'name slug')
-      .populate('sellerId', 'name sellerProfile')
+      .populate('vendorId', 'name avatar')
       .limit(8)
       .lean();
 
-    try {
-      await redis?.set(cacheKey, JSON.stringify(products), 'EX', 1800);
-    } catch (e) {}
+    await cacheService.set(cacheKey, products, 1800);
 
     res.status(200).json({
       success: true,
@@ -146,7 +169,7 @@ export const getProductBySlugOrId = async (req, res, next) => {
       ],
     })
       .populate('categoryId', 'name slug')
-      .populate('sellerId', 'name email sellerProfile');
+      .populate('vendorId', 'name email avatar');
 
     if (!product) {
       return res.status(404).json({
@@ -155,9 +178,8 @@ export const getProductBySlugOrId = async (req, res, next) => {
       });
     }
 
-    // Fetch latest reviews for this product
     const reviews = await Review.find({ productId: product._id })
-      .populate('buyerId', 'name avatar')
+      .populate('customerId', 'name avatar')
       .sort({ createdAt: -1 })
       .limit(10);
 
@@ -193,11 +215,11 @@ export const createProduct = async (req, res, next) => {
       title,
       description,
       categoryId,
-      sellerId: req.user._id,
-      price,
-      discountPrice: discountPrice || null,
-      stock,
-      sku,
+      vendorId: req.user._id,
+      price: parseFloat(price),
+      discountPrice: discountPrice ? parseFloat(discountPrice) : null,
+      stock: parseInt(stock, 10),
+      sku: sku.toUpperCase(),
       images,
       brand: brand || '',
       attributes: attributes || {},
@@ -205,11 +227,11 @@ export const createProduct = async (req, res, next) => {
       status: 'published',
     });
 
-    // Invalidate Redis caches
-    try {
-      const redis = getRedisClient();
-      await redis?.del('products:featured');
-    } catch (e) {}
+    // Invalidate Redis caches & index in Elasticsearch
+    await Promise.allSettled([
+      cacheService.del('products:featured'),
+      searchService.indexProduct(product),
+    ]);
 
     res.status(201).json({
       success: true,
@@ -228,14 +250,13 @@ export const updateProduct = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    // Only owner seller or admin can update
     if (
-      product.sellerId.toString() !== req.user._id.toString() &&
+      product.vendorId.toString() !== req.user._id.toString() &&
       req.user.role !== 'admin'
     ) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to update this product listing',
+        message: 'Forbidden: You do not own this product listing',
       });
     }
 
@@ -243,6 +264,11 @@ export const updateProduct = async (req, res, next) => {
       new: true,
       runValidators: true,
     });
+
+    await Promise.allSettled([
+      cacheService.del('products:featured'),
+      searchService.indexProduct(updated),
+    ]);
 
     res.status(200).json({
       success: true,
@@ -262,60 +288,25 @@ export const deleteProduct = async (req, res, next) => {
     }
 
     if (
-      product.sellerId.toString() !== req.user._id.toString() &&
+      product.vendorId.toString() !== req.user._id.toString() &&
       req.user.role !== 'admin'
     ) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to delete this product listing',
+        message: 'Forbidden: You do not have permission to delete this listing',
       });
     }
 
     await product.deleteOne();
 
+    await Promise.allSettled([
+      cacheService.del('products:featured'),
+      searchService.removeProduct(product._id),
+    ]);
+
     res.status(200).json({
       success: true,
-      message: 'Product removed successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const addReview = async (req, res, next) => {
-  try {
-    const { rating, comment } = req.body;
-    const { id: productId } = req.params;
-
-    const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
-    }
-
-    // Check if already reviewed
-    const existing = await Review.findOne({
-      productId,
-      buyerId: req.user._id,
-    });
-
-    if (existing) {
-      return res.status(400).json({
-        success: false,
-        message: 'You have already reviewed this product',
-      });
-    }
-
-    const review = await Review.create({
-      productId,
-      buyerId: req.user._id,
-      rating: Number(rating),
-      comment,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Review posted successfully',
-      data: review,
+      message: 'Product listing removed',
     });
   } catch (error) {
     next(error);

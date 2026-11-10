@@ -139,15 +139,15 @@ export const ProductCard = ({ product }) => {
           {product.title}
         </Link>
 
-        {/* Pricing and Action */}
+        {/* Pricing in INR */}
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
           <div>
             <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
-              ${activePrice.toFixed(2)}
+              ₹{activePrice.toLocaleString('en-IN')}
             </div>
             {hasDiscount && (
               <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', textDecoration: 'line-through' }}>
-                ${product.price.toFixed(2)}
+                ₹{product.price.toLocaleString('en-IN')}
               </div>
             )}
           </div>
