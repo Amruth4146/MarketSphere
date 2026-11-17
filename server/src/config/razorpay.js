@@ -23,9 +23,8 @@ export const getRazorpayClient = () => {
  * Verifies Razorpay payment signature using HMAC SHA256
  */
 export const verifyRazorpaySignature = (orderId, paymentId, signature) => {
-  if (!config.razorpay.keySecret) {
-    // In local development test mode without credentials
-    return true;
+  if (!config.razorpay.keySecret || !orderId || !paymentId || !signature) {
+    return false;
   }
   const body = `${orderId}|${paymentId}`;
   const expectedSignature = crypto
@@ -33,19 +32,27 @@ export const verifyRazorpaySignature = (orderId, paymentId, signature) => {
     .update(body.toString())
     .digest('hex');
 
-  return expectedSignature === signature;
+  const expectedBuf = Buffer.from(expectedSignature, 'utf8');
+  const signatureBuf = Buffer.from(signature, 'utf8');
+
+  if (expectedBuf.length !== signatureBuf.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuf, signatureBuf);
 };
 
 /**
- * Verifies Razorpay Webhook signature using raw request body
+ * Verifies Razorpay Webhook signature using raw request body.
+ * In production, strictly requires RAZORPAY_WEBHOOK_SECRET and never falls back to API key secret.
  */
 export const verifyRazorpayWebhookSignature = (rawBody, signature) => {
-  const secret = config.razorpay.webhookSecret || config.razorpay.keySecret;
-  if (!secret) {
-    // If no secret configured in test/dev mode
-    return true;
-  }
-  if (!rawBody || !signature) {
+  const secret =
+    config.nodeEnv === 'production'
+      ? config.razorpay.webhookSecret
+      : (config.razorpay.webhookSecret || config.razorpay.keySecret);
+
+  if (!secret || !rawBody || !signature) {
     return false;
   }
   const expectedSignature = crypto

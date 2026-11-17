@@ -23,6 +23,9 @@ import uploadRoutes from './routes/uploadRoutes.js';
 
 const app = express();
 
+// Trust reverse proxy (Render, Cloudflare, etc.) for correct protocol and IP forwarding
+app.set('trust proxy', 1);
+
 // Security and utility middleware
 app.use(helmet());
 app.use(

@@ -54,6 +54,12 @@ export const createRazorpayOrder = async (req, res, next) => {
         },
       });
     } else {
+      if (config.nodeEnv === 'production') {
+        return res.status(500).json({
+          success: false,
+          message: 'Payment gateway is not configured for production.',
+        });
+      }
       // Mock / Test order creation when credentials not set
       razorpayOrder = {
         id: `order_mock_${Date.now()}`,
@@ -299,6 +305,13 @@ export const verifyPayment = async (req, res, next) => {
         success: true,
         message: 'Payment has already been verified',
         data: storedPayment,
+      });
+    }
+
+    if (!config.razorpay.keySecret) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment verification service is unavailable. Gateway secret is not configured.',
       });
     }
 

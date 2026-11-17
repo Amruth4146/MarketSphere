@@ -23,6 +23,8 @@ export const config = {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD || undefined,
+    url: process.env.REDIS_URL || undefined,
+    tls: process.env.REDIS_TLS === 'true',
   },
   elasticsearch: {
     node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
@@ -46,4 +48,53 @@ export const config = {
     region: process.env.AWS_REGION || 'ap-south-1',
     s3Bucket: process.env.AWS_S3_BUCKET || '',
   },
+};
+
+/**
+ * Validates environment configuration for production readiness.
+ * Ensures critical services and security secrets are present, strong, and distinct.
+ * Never prints or leaks secret values in error messages.
+ */
+export const validateEnv = (cfg = config) => {
+  if (cfg.nodeEnv !== 'production') {
+    return;
+  }
+
+  const errors = [];
+
+  if (!cfg.mongo?.uri || cfg.mongo.uri.includes('localhost') || cfg.mongo.uri.includes('127.0.0.1')) {
+    errors.push('MONGO_URI must be configured for a production database (e.g. MongoDB Atlas) and cannot point to localhost.');
+  }
+
+  if (!cfg.clientOrigin || cfg.clientOrigin.includes('localhost') || cfg.clientOrigin.includes('127.0.0.1')) {
+    errors.push('CLIENT_ORIGIN must be configured for a production domain (e.g. Vercel deployment URL) and cannot point to localhost.');
+  }
+
+  const devJwtSecret = 'dev_jwt_secret_change_in_production_min_32_chars';
+  const devRefreshSecret = 'dev_refresh_secret_change_in_production_min_32_chars';
+
+  if (!cfg.jwt?.secret || cfg.jwt.secret === devJwtSecret || cfg.jwt.secret.length < 32) {
+    errors.push('JWT_SECRET must be set in production, must be at least 32 characters long, and cannot use the development fallback.');
+  }
+
+  if (!cfg.jwt?.refreshSecret || cfg.jwt.refreshSecret === devRefreshSecret || cfg.jwt.refreshSecret.length < 32) {
+    errors.push('JWT_REFRESH_SECRET must be set in production, must be at least 32 characters long, and cannot use the development fallback.');
+  }
+
+  if (cfg.jwt?.secret && cfg.jwt?.refreshSecret && cfg.jwt.secret === cfg.jwt.refreshSecret) {
+    errors.push('JWT_SECRET and JWT_REFRESH_SECRET must be distinct keys.');
+  }
+
+  if (!cfg.razorpay?.keyId || !cfg.razorpay?.keySecret) {
+    errors.push('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be configured in production.');
+  }
+
+  if (!cfg.razorpay?.webhookSecret) {
+    errors.push('RAZORPAY_WEBHOOK_SECRET must be configured in production.');
+  }
+
+  if (errors.length > 0) {
+    const errorMsg = `Production Environment Validation Failed:\n- ${errors.join('\n- ')}`;
+    throw new Error(errorMsg);
+  }
 };

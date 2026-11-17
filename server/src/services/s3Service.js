@@ -63,6 +63,10 @@ export const s3Service = {
       return { url, key, isMock: false };
     }
 
+    if (config.nodeEnv === 'production') {
+      throw new Error('AWS S3 storage is not configured in production. Image upload cannot be completed.');
+    }
+
     // Mock storage URL in development when AWS credentials are not set
     const mockUrl = `https://${config.aws.s3Bucket || 'marketsphere-bucket'}.s3.${config.aws.region || 'ap-south-1'}.amazonaws.com/${key}`;
     return {
@@ -98,6 +102,10 @@ export const s3Service = {
       return { uploadUrl, publicUrl, key, isMock: false };
     }
 
+    if (config.nodeEnv === 'production') {
+      throw new Error('AWS S3 storage is not configured in production. Presigned upload URL generation failed.');
+    }
+
     // Mock Presigned URL
     const publicUrl = `https://${config.aws.s3Bucket || 'marketsphere-bucket'}.s3.${config.aws.region || 'ap-south-1'}.amazonaws.com/${key}`;
     return {
@@ -130,6 +138,10 @@ export const s3Service = {
       });
       await client.send(command);
       return { success: true, key, isMock: false };
+    }
+
+    if (config.nodeEnv === 'production') {
+      throw new Error('AWS S3 storage is not configured in production. Image deletion cannot be completed.');
     }
 
     return { success: true, key, isMock: true };

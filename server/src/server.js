@@ -1,5 +1,5 @@
 import app from './app.js';
-import { config } from './config/env.js';
+import { config, validateEnv } from './config/env.js';
 import { connectDB } from './config/db.js';
 import { connectRedis } from './config/redis.js';
 import { checkElasticConnection } from './config/elasticsearch.js';
@@ -13,6 +13,9 @@ import {
 } from './controllers/paymentController.js';
 
 const startServer = async () => {
+  // Validate production configuration before connecting services or binding ports
+  validateEnv();
+
   // Attempt service connections
   await connectDB();
   await connectRedis();
