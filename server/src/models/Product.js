@@ -53,6 +53,11 @@ const productSchema = new mongoose.Schema(
       uppercase: true,
       trim: true,
     },
+    gstRate: {
+      type: Number,
+      enum: [0, 5, 12, 18, 28],
+      default: 18,
+    },
     images: {
       type: [String],
       validate: {
@@ -93,6 +98,11 @@ const productSchema = new mongoose.Schema(
       default: 'published',
       index: true,
     },
+    appliedMutations: {
+      type: [String],
+      default: [],
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -111,6 +121,7 @@ productSchema.index({ title: 'text', description: 'text', brand: 'text' });
 productSchema.index({ categoryId: 1, status: 1, price: 1 });
 productSchema.index({ vendorId: 1, status: 1 });
 productSchema.index({ status: 1, averageRating: -1 });
+productSchema.index({ appliedMutations: 1 });
 
 // Auto-generate slug from title
 productSchema.pre('save', function (next) {

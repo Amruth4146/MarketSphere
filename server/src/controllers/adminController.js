@@ -77,3 +77,16 @@ export const updateVendorStatus = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getAllOrdersAdmin = async (req, res, next) => {
+  try {
+    const orders = await Order.find({})
+      .populate('customerId', 'name email phone')
+      .populate('vendorOrders')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: orders });
+  } catch (error) {
+    next(error);
+  }
+};

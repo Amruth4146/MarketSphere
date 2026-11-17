@@ -33,5 +33,9 @@ export const productValidator = [
   body('images')
     .isArray({ min: 1 })
     .withMessage('At least one product image is required'),
+  body('gstRate')
+    .optional()
+    .isIn([0, 5, 12, 18, 28])
+    .withMessage('GST rate must be one of [0, 5, 12, 18, 28]%'),
 ];
 

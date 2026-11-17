@@ -11,6 +11,9 @@ const orderItemSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     quantity: { type: Number, required: true, min: 1 },
     image: { type: String, default: '' },
+    sku: { type: String, default: '' },
+    gstRate: { type: Number, default: 18 },
+    taxAmount: { type: Number, default: 0 },
     vendorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -68,7 +71,7 @@ const orderSchema = new mongoose.Schema(
     paymentStatus: {
       type: String,
       enum: ['pending', 'paid', 'failed', 'refunded'],
-      default: 'paid',
+      default: 'pending',
     },
     orderStatus: {
       type: String,

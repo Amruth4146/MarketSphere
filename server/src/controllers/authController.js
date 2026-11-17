@@ -4,7 +4,17 @@ import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
+  hashToken,
 } from '../utils/generateToken.js';
+import { config } from '../config/env.js';
+
+const getRefreshTokenCookieOptions = () => ({
+  httpOnly: true,
+  secure: config.nodeEnv === 'production',
+  sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+  path: '/',
+});
 
 export const register = async (req, res, next) => {
   try {
@@ -51,9 +61,12 @@ export const register = async (req, res, next) => {
     const token = generateAccessToken(user._id, user.role);
     const refreshToken = generateRefreshToken(user._id);
 
-    // Save refresh token to user
-    user.refreshToken = refreshToken;
+    // Secure Priority 3: Store SHA-256 hash in database rather than raw JWT
+    user.refreshToken = hashToken(refreshToken);
     await user.save();
+
+    // Set secure HttpOnly cookie
+    res.cookie('refreshToken', refreshToken, getRefreshTokenCookieOptions());
 
     res.status(201).json({
       success: true,
@@ -113,8 +126,12 @@ export const login = async (req, res, next) => {
     const token = generateAccessToken(user._id, user.role);
     const refreshToken = generateRefreshToken(user._id);
 
-    user.refreshToken = refreshToken;
+    // Secure Priority 3: Store SHA-256 hash in database
+    user.refreshToken = hashToken(refreshToken);
     await user.save();
+
+    // Set secure HttpOnly cookie
+    res.cookie('refreshToken', refreshToken, getRefreshTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -141,7 +158,7 @@ export const login = async (req, res, next) => {
 
 export const refreshToken = async (req, res, next) => {
   try {
-    const { refreshToken: incomingToken } = req.body;
+    const incomingToken = req.body?.refreshToken || req.cookies?.refreshToken;
 
     if (!incomingToken) {
       return res.status(400).json({
@@ -161,10 +178,24 @@ export const refreshToken = async (req, res, next) => {
     }
 
     const user = await User.findById(decoded.id).select('+refreshToken');
-    if (!user || user.refreshToken !== incomingToken) {
+    const incomingHash = hashToken(incomingToken);
+
+    if (!user || !user.refreshToken) {
       return res.status(401).json({
         success: false,
-        message: 'Refresh token has been revoked or is no longer valid',
+        message: 'Refresh token has been revoked or session expired',
+      });
+    }
+
+    // Token Reuse Detection: If token is valid JWT for this user but does not match stored hash
+    if (user.refreshToken !== incomingHash) {
+      console.warn(`[Security Alert] Refresh token reuse detected for user ${user._id}. Revoking all sessions.`);
+      user.refreshToken = null;
+      await user.save();
+      res.clearCookie('refreshToken', getRefreshTokenCookieOptions());
+      return res.status(401).json({
+        success: false,
+        message: 'Compromised or reused refresh token. Please login again.',
       });
     }
 
@@ -175,11 +206,15 @@ export const refreshToken = async (req, res, next) => {
       });
     }
 
+    // Token Rotation: Issue fresh access token and fresh refresh token
     const newAccessToken = generateAccessToken(user._id, user.role);
     const newRefreshToken = generateRefreshToken(user._id);
 
-    user.refreshToken = newRefreshToken;
+    // Invalidate old token by saving new hash
+    user.refreshToken = hashToken(newRefreshToken);
     await user.save();
+
+    res.cookie('refreshToken', newRefreshToken, getRefreshTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -195,6 +230,7 @@ export const refreshToken = async (req, res, next) => {
 
 export const logout = async (req, res, next) => {
   try {
+    res.clearCookie('refreshToken', getRefreshTokenCookieOptions());
     if (req.user) {
       await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } });
     }

@@ -8,12 +8,13 @@ import {
   Package,
   Store,
   ChevronDown,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
 export const Navbar = () => {
-  const { user, isAuthenticated, isVendor, logout } = useAuth();
+  const { user, isAuthenticated, isVendor, isAdmin, logout } = useAuth();
   const { itemsCount } = useCart();
   const [keyword, setKeyword] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -236,6 +237,25 @@ export const Navbar = () => {
                       }}
                     >
                       <Store size={16} /> Vendor Portal
+                    </Link>
+                  )}
+
+                  {isAdmin && (
+                    <Link
+                      to="/admin/dashboard"
+                      onClick={() => setMenuOpen(false)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem 0.75rem',
+                        fontSize: '0.875rem',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--primary)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <ShieldCheck size={16} /> Admin Console
                     </Link>
                   )}
 

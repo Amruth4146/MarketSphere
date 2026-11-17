@@ -30,6 +30,21 @@ export const productService = {
     return res.data;
   },
 
+  updateProduct: async (productId, productData) => {
+    const res = await request(`/products/${productId}`, {
+      method: 'PUT',
+      body: JSON.stringify(productData),
+    });
+    return res.data;
+  },
+
+  deleteProduct: async (productId) => {
+    const res = await request(`/products/${productId}`, {
+      method: 'DELETE',
+    });
+    return res.data;
+  },
+
   addReview: async (productId, reviewData) => {
     const res = await request(`/reviews/product/${productId}`, {
       method: 'POST',

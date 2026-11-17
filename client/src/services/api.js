@@ -13,6 +13,7 @@ export const request = async (endpoint, options = {}, isRetry = false) => {
   const config = {
     ...options,
     headers,
+    credentials: 'include',
   };
 
   try {
