@@ -2,8 +2,17 @@ import Redis from 'ioredis';
 import { config } from './env.js';
 
 let redisClient = null;
+let disabledLogged = false;
 
 export const getRedisClient = () => {
+  if (!config.redis.enabled) {
+    if (!disabledLogged) {
+      console.log('[Redis] Redis is disabled (REDIS_ENABLED=false). Operating without Redis cache.');
+      disabledLogged = true;
+    }
+    return null;
+  }
+
   if (!redisClient) {
     const redisUrl = config.redis.url;
     const isUpstash =
@@ -50,8 +59,14 @@ export const getRedisClient = () => {
 };
 
 export const connectRedis = async () => {
+  if (!config.redis.enabled) {
+    console.log('[Redis] Redis is disabled (REDIS_ENABLED=false). Skipping connection attempt.');
+    return null;
+  }
+
   try {
     const client = getRedisClient();
+    if (!client) return null;
     await client.connect();
     return client;
   } catch (error) {

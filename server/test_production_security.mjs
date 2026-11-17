@@ -6,6 +6,7 @@ import {
   verifyRazorpayWebhookSignature,
 } from './src/config/razorpay.js';
 import { s3Service } from './src/services/s3Service.js';
+import { getRedisClient, connectRedis } from './src/config/redis.js';
 
 console.log('=== RUNNING PRODUCTION CONFIGURATION & SECURITY VERIFICATION ===\n');
 
@@ -330,6 +331,21 @@ console.log('5. Testing Upstash Redis Configuration...');
   assert.strictEqual(explicitTls.isTls, true, 'REDIS_TLS=true should enable TLS');
 
   console.log('  âœ“ Redis Upstash and TLS auto-detection correctly verified.');
+}
+
+// Test REDIS_ENABLED toggle
+{
+  const originalRedisEnabled = config.redis.enabled;
+  try {
+    config.redis.enabled = false;
+    assert.strictEqual(getRedisClient(), null, 'getRedisClient must return null when redis.enabled is false');
+    const connectResult = await connectRedis();
+    assert.strictEqual(connectResult, null, 'connectRedis must return null when redis.enabled is false');
+
+    console.log('  âœ“ Redis disabled toggle (REDIS_ENABLED=false) safely returns null and skips connection.');
+  } finally {
+    config.redis.enabled = originalRedisEnabled;
+  }
 }
 
 console.log('\n=== ALL PRODUCTION SECURITY & CONFIGURATION TESTS PASSED! ===');
