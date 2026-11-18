@@ -42,49 +42,68 @@ export const createRazorpayOrder = async (req, res, next) => {
     const amountInPaise = Math.round(order.totalPrice * 100);
     const razorpay = getRazorpayClient();
 
+    // Prevent duplicate payment-order creation:
+    // If an active Payment record exists for this order in 'created' status with a valid razorpayOrderId,
+    // reuse it instead of creating duplicate orders on Razorpay
+    let payment = await Payment.findOne({ orderId: order._id, status: 'created' });
+
     let razorpayOrder;
-    if (razorpay) {
-      razorpayOrder = await razorpay.orders.create({
-        amount: amountInPaise,
-        currency: 'INR',
-        receipt: `receipt_${order.orderNumber}`,
-        notes: {
-          orderId: order._id.toString(),
-          customerId: order.customerId.toString(),
-        },
-      });
-    } else {
-      if (config.nodeEnv === 'production') {
-        return res.status(500).json({
+    if (payment && payment.razorpayOrderId) {
+      if (Math.round(payment.amount * 100) !== amountInPaise) {
+        return res.status(400).json({
           success: false,
-          message: 'Payment gateway is not configured for production.',
+          message: 'Existing payment amount does not match the current order amount.',
         });
       }
-      // Mock / Test order creation when credentials not set
+
       razorpayOrder = {
-        id: `order_mock_${Date.now()}`,
+        id: payment.razorpayOrderId,
         amount: amountInPaise,
         currency: 'INR',
         status: 'created',
       };
-    }
-
-    // Save initial Payment record (status: 'created')
-    let payment = await Payment.findOne({ orderId: order._id, status: 'created' });
-    if (!payment) {
-      payment = await Payment.create({
-        orderId: order._id,
-        customerId: order.customerId,
-        paymentGateway: 'razorpay',
-        razorpayOrderId: razorpayOrder.id,
-        amount: order.totalPrice,
-        currency: 'INR',
-        status: 'created',
-        receipt: `receipt_${order.orderNumber}`,
-      });
     } else {
-      payment.razorpayOrderId = razorpayOrder.id;
-      await payment.save();
+      if (razorpay) {
+        razorpayOrder = await razorpay.orders.create({
+          amount: amountInPaise,
+          currency: 'INR',
+          receipt: `receipt_${order.orderNumber}`,
+          notes: {
+            orderId: order._id.toString(),
+            customerId: order.customerId.toString(),
+          },
+        });
+      } else {
+        if (config.nodeEnv === 'production') {
+          return res.status(500).json({
+            success: false,
+            message: 'Payment gateway is not configured for production.',
+          });
+        }
+        // Mock / Test order creation when credentials not set
+        razorpayOrder = {
+          id: `order_mock_${Date.now()}`,
+          amount: amountInPaise,
+          currency: 'INR',
+          status: 'created',
+        };
+      }
+
+      if (!payment) {
+        payment = await Payment.create({
+          orderId: order._id,
+          customerId: order.customerId,
+          paymentGateway: 'razorpay',
+          razorpayOrderId: razorpayOrder.id,
+          amount: order.totalPrice,
+          currency: 'INR',
+          status: 'created',
+          receipt: `receipt_${order.orderNumber}`,
+        });
+      } else {
+        payment.razorpayOrderId = razorpayOrder.id;
+        await payment.save();
+      }
     }
 
     res.status(200).json({
@@ -269,7 +288,10 @@ export const verifyPayment = async (req, res, next) => {
 
     // Strict Gateway Order Pairing:
     // Match the submitted Razorpay order ID against the exact stored Razorpay order ID for this marketplace order
-    const storedPayment = await Payment.findOne({ orderId });
+    const storedPayment = await Payment.findOne({
+      orderId,
+      razorpayOrderId,
+    });
     if (!storedPayment || !storedPayment.razorpayOrderId) {
       return res.status(400).json({
         success: false,

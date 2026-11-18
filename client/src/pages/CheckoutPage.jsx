@@ -129,9 +129,10 @@ export const CheckoutPage = () => {
 
       // Razorpay Payment Flow
       const rzpData = await paymentService.createRazorpayOrder(orderId);
+      const isLoaded = await paymentService.loadRazorpayScript();
 
-      // Check if interactive Razorpay SDK is available on window
-      if (window.Razorpay && rzpData.keyId && rzpData.keyId !== 'rzp_test_mock_key') {
+      // Check if interactive Razorpay SDK is available and key is valid
+      if (isLoaded && window.Razorpay && !paymentService.isMockKey(rzpData.keyId)) {
         const options = {
           key: rzpData.keyId,
           amount: rzpData.amount,
@@ -171,15 +172,26 @@ export const CheckoutPage = () => {
         };
 
         const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (resp) {
+          setError(resp.error?.description || 'Payment was declined by bank or gateway');
+          clearCart();
+          navigate(`/order-success/${orderId}?status=pending`);
+        });
         rzp.open();
         setLoading(false);
       } else {
-        // Dev / Test simulation modal for Razorpay payment
-        setPendingPaymentData({
-          order: createdOrder,
-          orderId,
-          rzpData,
-        });
+        // Dev / Test simulation modal for Razorpay payment (strictly disabled in production)
+        if (import.meta.env.DEV) {
+          setPendingPaymentData({
+            order: createdOrder,
+            orderId,
+            rzpData,
+          });
+        } else {
+          setError('Payment gateway is not configured for live payments. Please contact support.');
+          clearCart();
+          navigate(`/order-success/${orderId}?status=pending`);
+        }
         setLoading(false);
       }
     } catch (err) {
@@ -189,7 +201,7 @@ export const CheckoutPage = () => {
   };
 
   const handleSimulatedPaymentConfirm = async () => {
-    if (!pendingPaymentData) return;
+    if (!pendingPaymentData || !import.meta.env.DEV) return;
     setVerifyingPayment(true);
     setError('');
 

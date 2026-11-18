@@ -60,6 +60,28 @@ const runAudit = async () => {
     // TEST 2: Production Seeding (Zero Admin, 5 Categories, 25 Products)
     // -------------------------------------------------------------------------
     console.log('\n--- TEST 2: Hardened Production Seeding ---');
+    // Create an approved vendor in the isolated test database.
+    const testVendorUserId = new mongoose.Types.ObjectId();
+    const testVendorId = new mongoose.Types.ObjectId();
+
+    await mongoose.connection.db.collection('users').insertOne({
+      _id: testVendorUserId,
+      name: 'Test Vendor',
+      email: 'testvendor@example.com',
+      password: await bcrypt.hash('TestPassword123!', 10),
+      role: 'vendor',
+      vendorId: testVendorId,
+      isActive: true
+    });
+
+    await mongoose.connection.db.collection('vendors').insertOne({
+      _id: testVendorId,
+      userId: testVendorUserId,
+      businessName: 'Test Vendor Store',
+      storeSlug: 'test-vendor-store',
+      status: 'approved',
+      isVerified: false
+    });
     const prodResult = await runSeedProcess({ NODE_ENV: 'production' }, ['--confirm-production']);
     assert.strictEqual(prodResult.code, 0, `Production seed failed with stdout: ${prodResult.stdout} stderr: ${prodResult.stderr}`);
     assert(!prodResult.stdout.includes('Password123!'), 'Production stdout must NEVER print Password123!');
@@ -76,14 +98,19 @@ const runAudit = async () => {
     assert.strictEqual(adminUser, null, 'Production seeding must NEVER create an admin account');
     console.log('  ✓ Verified: Zero admin accounts created in production mode');
 
-    // 2. Verify demo vendors use strong random unguessable passwords
+    // 2. Verify the existing approved vendor was reused.
     const vendorUsers = await usersCollection.find({ role: 'vendor' }).toArray();
-    assert(vendorUsers.length > 0, 'Demo vendors should exist to satisfy product foreign keys');
-    for (const v of vendorUsers) {
-      const isWeakPass = await bcrypt.compare('Password123!', v.password);
-      assert.strictEqual(isWeakPass, false, `Vendor ${v.email} must NOT have Password123!`);
-    }
-    console.log(`  ✓ Verified: Demo vendor accounts use cryptographically secure random passwords (not Password123!)`);
+
+    assert.strictEqual(vendorUsers.length, 1, 'Production must reuse the existing vendor without creating demo vendors');
+
+    const reusedVendor = await mongoose.connection.db
+      .collection('vendors')
+      .findOne({ _id: testVendorId });
+
+    assert(reusedVendor, 'Existing approved vendor must be preserved');
+    assert.strictEqual(reusedVendor.status, 'approved');
+
+    console.log('  ✓ Verified: Existing approved vendor reused; no demo vendor created');
 
     // 3. Verify Categories and Products
     const catCount = await categoriesCollection.countDocuments();

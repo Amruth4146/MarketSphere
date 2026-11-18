@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { config } from '../config/env.js';
 import { User } from '../models/User.js';
@@ -29,6 +28,12 @@ const seedDatabase = async () => {
     // Safety guard: Non-destructive by default in production; destructive reset only with explicit --force-reset
     const isForceReset = process.argv.includes('--force-reset');
     const isProduction = config.nodeEnv === 'production' || isProductionDb;
+
+    if (isProduction && isForceReset) {
+      throw new Error(
+        'Force reset is disabled for production databases.'
+      );
+    }
 
     if (isProduction && !isForceReset) {
       console.log('[Seed Safety] Production environment or Atlas database detected. Safe non-destructive mode active.');
@@ -182,121 +187,36 @@ const seedDatabase = async () => {
         });
       }
     } else {
-      // -------------------------------------------------------------
-      // 1. PRODUCTION ENVIRONMENT SEEDING (HARDENED & NON-DESTRUCTIVE)
-      // -------------------------------------------------------------
-      // Strict production security rules:
-      // - NEVER create a default admin account
-      // - NEVER use Password123! or any publicly known password
-      // - Reuse existing approved production vendor accounts where available
-      // - If demo vendor accounts are needed to satisfy product vendorId requirements,
-      //   use cryptographically secure random passwords (never logged or printed)
-      // - Zero fake reviews or fake ratings
-      console.log('[Seed Production] Hardened production mode active.');
+      // PRODUCTION ENVIRONMENT SEEDING
+      // Reuse existing approved vendors only.
+      console.log('[Seed Production] Safe production mode active.');
 
-      const existingApprovedVendors = await Vendor.find({ status: 'approved' });
-      if (existingApprovedVendors.length >= 2) {
-        techVendorUser = await User.findById(existingApprovedVendors[0].userId);
-        styleVendorUser = await User.findById(existingApprovedVendors[1].userId);
-        console.log('[Seed Production] Reusing 2 existing approved production vendor accounts.');
-      } else if (existingApprovedVendors.length === 1) {
-        techVendorUser = await User.findById(existingApprovedVendors[0].userId);
-        styleVendorUser = techVendorUser;
-        console.log('[Seed Production] Reusing existing approved production vendor account.');
-      }
+      const approvedVendors = await Vendor.find({
+        status: 'approved'
+      }).sort({ createdAt: 1 });
 
-      // If existing vendor users are not found, safely find or create demo vendor accounts with strong random unguessable passwords
-      if (!techVendorUser) {
-        techVendorUser = await User.findOne({ email: 'vendor@apextech.com' });
-        if (!techVendorUser) {
-          const secureRandomPassword = crypto.randomBytes(32).toString('hex') + 'A1!';
-          techVendorUser = await User.create({
-            name: 'Apex Electronics Pvt Ltd',
-            email: 'vendor@apextech.com',
-            password: secureRandomPassword,
-            role: 'vendor',
-            phone: '9820098200',
-          });
-        }
-        let techVendor = await Vendor.findOne({ storeSlug: 'apex-electronics' });
-        if (!techVendor) {
-          techVendor = await Vendor.create({
-            userId: techVendorUser._id,
-            businessName: 'Apex Electronics Pvt Ltd',
-            storeSlug: 'apex-electronics',
-            description: 'Authorized retailer of high-performance wireless audio, laptops, and smart consumer electronics.',
-            gstin: '27AABCU9603R1ZN',
-            pan: 'AABCU9603R',
-            bankDetails: {
-              accountHolderName: 'Apex Electronics Pvt Ltd',
-              accountNumber: '50200012345678',
-              ifscCode: 'HDFC0000123',
-              bankName: 'HDFC Bank',
-              branch: 'Nariman Point, Mumbai',
-            },
-            address: {
-              street: 'Unit 402, Trade World B Wing, Senapati Bapat Marg, Lower Parel',
-              city: 'Mumbai',
-              state: 'Maharashtra',
-              postalCode: '400013',
-              country: 'India',
-            },
-            commissionRate: 10.0,
-            rating: 4.8,
-            ratingCount: 142,
-            isVerified: true,
-            status: 'approved',
-          });
-          techVendorUser.vendorId = techVendor._id;
-          await techVendorUser.save();
+      const validVendorUsers = [];
+
+      for (const vendor of approvedVendors) {
+        const vendorUser = await User.findById(vendor.userId);
+
+        if (vendorUser && vendorUser.role === 'vendor') {
+          validVendorUsers.push(vendorUser);
         }
       }
 
-      if (!styleVendorUser) {
-        styleVendorUser = await User.findOne({ email: 'vendor@urbanthreads.com' });
-        if (!styleVendorUser) {
-          const secureRandomPassword = crypto.randomBytes(32).toString('hex') + 'A1!';
-          styleVendorUser = await User.create({
-            name: 'Urban Threads Studio',
-            email: 'vendor@urbanthreads.com',
-            password: secureRandomPassword,
-            role: 'vendor',
-            phone: '9811198111',
-          });
-        }
-        let styleVendor = await Vendor.findOne({ storeSlug: 'urban-threads' });
-        if (!styleVendor) {
-          styleVendor = await Vendor.create({
-            userId: styleVendorUser._id,
-            businessName: 'Urban Threads Studio',
-            storeSlug: 'urban-threads',
-            description: 'Contemporary sustainable apparel, artisanal leather goods, and minimal timepieces.',
-            gstin: '29ABCDE1234F1Z5',
-            pan: 'ABCDE1234F',
-            bankDetails: {
-              accountHolderName: 'Urban Threads Studio',
-              accountNumber: '91802001234567',
-              ifscCode: 'UTIB0000045',
-              bankName: 'Axis Bank',
-              branch: 'Indiranagar, Bengaluru',
-            },
-            address: {
-              street: '72, 100 Feet Road, HAL 2nd Stage, Indiranagar',
-              city: 'Bengaluru',
-              state: 'Karnataka',
-              postalCode: '560038',
-              country: 'India',
-            },
-            commissionRate: 12.0,
-            rating: 4.7,
-            ratingCount: 88,
-            isVerified: true,
-            status: 'approved',
-          });
-          styleVendorUser.vendorId = styleVendor._id;
-          await styleVendorUser.save();
-        }
+      if (validVendorUsers.length === 0) {
+        throw new Error(
+          'Production seeding stopped: No approved vendor account exists.'
+        );
       }
+
+      techVendorUser = validVendorUsers[0];
+      styleVendorUser = validVendorUsers[1] || validVendorUsers[0];
+
+      console.log(
+        `[Seed Production] Reusing ${validVendorUsers.length} approved vendor account(s).`
+      );
     }
 
     // 4. Create 5 Verified Marketplace Categories
@@ -982,6 +902,14 @@ const seedDatabase = async () => {
         status: 'published',
       },
     ];
+
+    // Reset fabricated ratings for production seed products.
+    if (isProduction) {
+      for (const product of sampleProducts) {
+        product.averageRating = 0;
+        product.reviewCount = 0;
+      }
+    }
 
     let insertedCount = 0;
     for (const prodData of sampleProducts) {
