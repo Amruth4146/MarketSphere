@@ -4,10 +4,14 @@ import {
   uploadImage,
   getPresignedUrl,
   deleteImage,
+  viewImage,
 } from '../controllers/uploadController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Public image view / presigned download route (safe for private S3 buckets)
+router.get('/view/*', viewImage);
 
 // Protected upload routes (Vendor and Admin only)
 router.post(

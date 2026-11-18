@@ -13,6 +13,11 @@ import { productService } from '../services/productService.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
+const FALLBACK_PRODUCT_IMAGE =
+  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80';
+const SVG_FALLBACK =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600' fill='%23f8fafc'%3E%3Crect width='600' height='600' fill='%23f8fafc'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='system-ui, sans-serif' font-size='18' fill='%2394a3b8'%3EImage Unavailable%3C/text%3E%3C/svg%3E";
+
 export const ProductDetailPage = () => {
   const { identifier } = useParams();
   const navigate = useNavigate();
@@ -21,8 +26,10 @@ export const ProductDetailPage = () => {
 
   const [productData, setProductData] = useState(null);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [mainImgSrc, setMainImgSrc] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [added, setAdded] = useState(false);
 
   // Review submission state
@@ -31,20 +38,40 @@ export const ProductDetailPage = () => {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewMessage, setReviewMessage] = useState('');
 
+  const fetchDetail = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await productService.getProduct(identifier);
+      setProductData(data);
+      const initialImage = data?.product?.images?.[0] || FALLBACK_PRODUCT_IMAGE;
+      setMainImgSrc(initialImage);
+    } catch (err) {
+      console.error('Failed to load product', err);
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDetail = async () => {
-      setLoading(true);
-      try {
-        const data = await productService.getProduct(identifier);
-        setProductData(data);
-      } catch (err) {
-        console.error('Failed to load product', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchDetail();
   }, [identifier]);
+
+  // Update main image source when thumbnail is selected
+  useEffect(() => {
+    if (productData?.product?.images?.[selectedImage]) {
+      setMainImgSrc(productData.product.images[selectedImage]);
+    }
+  }, [selectedImage, productData]);
+
+  const handleMainImageError = () => {
+    if (mainImgSrc !== FALLBACK_PRODUCT_IMAGE) {
+      setMainImgSrc(FALLBACK_PRODUCT_IMAGE);
+    } else {
+      setMainImgSrc(SVG_FALLBACK);
+    }
+  };
 
   if (loading) {
     return (
@@ -54,17 +81,67 @@ export const ProductDetailPage = () => {
     );
   }
 
-  if (!productData?.product) {
+  const isNotFoundOrUnavailable =
+    !productData?.product &&
+    (error?.status === 404 ||
+      error?.message?.toLowerCase().includes('not found') ||
+      error?.message?.toLowerCase().includes('unavailable') ||
+      !error);
+
+  if (isNotFoundOrUnavailable) {
     return (
-      <div className="container" style={{ padding: '5rem 0', textAlign: 'center' }}>
-        <h2>Product Not Found</h2>
-        <p style={{ color: 'var(--text-muted)', margin: '1rem 0' }}>The product listing may have been moved or removed.</p>
-        <Link to="/products" className="btn btn-primary">Browse Catalog</Link>
+      <div className="container" style={{ padding: '5rem 1.5rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{
+          backgroundColor: '#ffffff',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--border)',
+          padding: '3rem 2rem',
+          boxShadow: 'var(--shadow-sm)',
+        }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>
+            Product Unavailable
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+            This product is currently unavailable or has been removed from our marketplace catalog.
+          </p>
+          <Link to="/products" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '1rem' }}>
+            Return to Shopping
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container" style={{ padding: '5rem 1.5rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{
+          backgroundColor: '#ffffff',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid #fecaca',
+          padding: '3rem 2rem',
+        }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.75rem', color: '#b91c1c' }}>
+            Unable to Load Product
+          </h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+            {error.message || 'An error occurred while communicating with the server.'}
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button onClick={fetchDetail} className="btn btn-primary">
+              Try Again
+            </button>
+            <Link to="/products" className="btn btn-secondary">
+              Return to Shopping
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
   const { product, reviews = [] } = productData;
+  const isOutOfStock = typeof product.stock === 'number' && product.stock <= 0;
   const activePrice = product.discountPrice || product.price;
   const hasDiscount = product.discountPrice && product.discountPrice < product.price;
   const discountPercent = hasDiscount
@@ -72,12 +149,14 @@ export const ProductDetailPage = () => {
     : 0;
 
   const handleAddToCart = () => {
+    if (isOutOfStock) return;
     addToCart(product, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
 
   const handleBuyNow = () => {
+    if (isOutOfStock) return;
     addToCart(product, quantity);
     navigate('/checkout');
   };
@@ -123,8 +202,9 @@ export const ProductDetailPage = () => {
             marginBottom: '1rem',
           }}>
             <img
-              src={product.images?.[selectedImage] || product.images?.[0]}
+              src={mainImgSrc || FALLBACK_PRODUCT_IMAGE}
               alt={product.title}
+              onError={handleMainImageError}
               style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             />
           </div>
@@ -143,9 +223,17 @@ export const ProductDetailPage = () => {
                     overflow: 'hidden',
                     border: selectedImage === idx ? '2px solid var(--primary)' : '1px solid var(--border)',
                     backgroundColor: '#fff',
+                    cursor: 'pointer',
                   }}
                 >
-                  <img src={img} alt="Thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img
+                    src={img}
+                    alt="Thumb"
+                    onError={(e) => {
+                      e.currentTarget.src = SVG_FALLBACK;
+                    }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
                 </button>
               ))}
             </div>
@@ -173,8 +261,12 @@ export const ProductDetailPage = () => {
               ({product.reviewCount || 0} reviews)
             </span>
             <span style={{ color: 'var(--border)' }}>|</span>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: product.stock > 0 ? 'var(--success)' : 'var(--danger)' }}>
-              {product.stock > 0 ? `In Stock (${product.stock} units)` : 'Out of Stock'}
+            <span style={{
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              color: isOutOfStock ? 'var(--danger)' : 'var(--success)'
+            }}>
+              {isOutOfStock ? 'Out of Stock' : `In Stock (${product.stock} units)`}
             </span>
           </div>
 
@@ -218,17 +310,31 @@ export const ProductDetailPage = () => {
               backgroundColor: '#fff',
             }}>
               <button
+                disabled={isOutOfStock || quantity <= 1}
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                style={{ padding: '0.6rem 0.9rem', fontWeight: 700, fontSize: '1.1rem' }}
+                style={{
+                  padding: '0.6rem 0.9rem',
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                  opacity: isOutOfStock || quantity <= 1 ? 0.35 : 1,
+                  cursor: isOutOfStock || quantity <= 1 ? 'not-allowed' : 'pointer',
+                }}
               >
                 -
               </button>
               <span style={{ padding: '0.6rem 0.9rem', fontWeight: 700, minWidth: '40px', textAlign: 'center' }}>
-                {quantity}
+                {isOutOfStock ? 0 : quantity}
               </span>
               <button
+                disabled={isOutOfStock || quantity >= product.stock}
                 onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                style={{ padding: '0.6rem 0.9rem', fontWeight: 700, fontSize: '1.1rem' }}
+                style={{
+                  padding: '0.6rem 0.9rem',
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                  opacity: isOutOfStock || quantity >= product.stock ? 0.35 : 1,
+                  cursor: isOutOfStock || quantity >= product.stock ? 'not-allowed' : 'pointer',
+                }}
               >
                 +
               </button>
@@ -236,10 +342,19 @@ export const ProductDetailPage = () => {
 
             <button
               onClick={handleAddToCart}
-              className={`btn ${added ? 'btn-secondary' : 'btn-primary'}`}
-              style={{ flex: 1, padding: '0.75rem 1.5rem', fontSize: '1rem' }}
+              disabled={isOutOfStock}
+              className={`btn ${added ? 'btn-secondary' : isOutOfStock ? 'btn-secondary' : 'btn-primary'}`}
+              style={{
+                flex: 1,
+                padding: '0.75rem 1.5rem',
+                fontSize: '1rem',
+                opacity: isOutOfStock ? 0.65 : 1,
+                cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+              }}
             >
-              {added ? (
+              {isOutOfStock ? (
+                'Out of Stock'
+              ) : added ? (
                 <>
                   <Check size={18} color="var(--success)" /> Added to Bag
                 </>
@@ -250,13 +365,15 @@ export const ProductDetailPage = () => {
               )}
             </button>
 
-            <button
-              onClick={handleBuyNow}
-              className="btn btn-secondary"
-              style={{ padding: '0.75rem 1.5rem', fontSize: '1rem', backgroundColor: '#0f172a', color: '#fff' }}
-            >
-              <Zap size={18} color="#fbbf24" /> Buy Now
-            </button>
+            {!isOutOfStock && (
+              <button
+                onClick={handleBuyNow}
+                className="btn btn-secondary"
+                style={{ padding: '0.75rem 1.5rem', fontSize: '1rem', backgroundColor: '#0f172a', color: '#fff' }}
+              >
+                <Zap size={18} color="#fbbf24" /> Buy Now
+              </button>
+            )}
           </div>
 
           {/* Trust Guarantees */}

@@ -28,6 +28,14 @@ export const config = {
     tls: process.env.REDIS_TLS === 'true',
   },
   elasticsearch: {
+    enabled:
+      process.env.ELASTICSEARCH_ENABLED === 'true' ||
+      (process.env.ELASTICSEARCH_ENABLED !== 'false' &&
+        Boolean(
+          process.env.ELASTICSEARCH_NODE &&
+            process.env.ELASTICSEARCH_NODE !== 'http://localhost:9200' &&
+            process.env.ELASTICSEARCH_NODE !== 'http://127.0.0.1:9200'
+        )),
     node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
     username: process.env.ELASTICSEARCH_USERNAME || '',
     password: process.env.ELASTICSEARCH_PASSWORD || '',
@@ -48,6 +56,7 @@ export const config = {
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
     region: process.env.AWS_REGION || 'ap-south-1',
     s3Bucket: process.env.AWS_S3_BUCKET || '',
+    cloudfrontDomain: process.env.AWS_CLOUDFRONT_DOMAIN || '',
   },
 };
 

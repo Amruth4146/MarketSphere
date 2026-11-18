@@ -7,7 +7,7 @@ import {
   updateProduct,
   deleteProduct,
 } from '../controllers/productController.js';
-import { protect, authorize } from '../middleware/authMiddleware.js';
+import { protect, authorize, optionalProtect } from '../middleware/authMiddleware.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { productValidator } from '../validators/productValidator.js';
 
@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.get('/', getProducts);
 router.get('/featured', getFeaturedProducts);
-router.get('/:identifier', getProductBySlugOrId);
+router.get('/:identifier', optionalProtect, getProductBySlugOrId);
 
 // Vendor / Admin management routes
 router.post(

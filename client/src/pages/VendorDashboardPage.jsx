@@ -449,6 +449,10 @@ export const VendorDashboardPage = () => {
                         <img
                           src={p.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'}
                           alt={p.title}
+                          onError={(e) => {
+                            e.currentTarget.src =
+                              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' fill='%23f1f5f9'%3E%3Crect width='100' height='100' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='system-ui, sans-serif' font-size='10' fill='%2394a3b8'%3EItem%3C/text%3E%3C/svg%3E";
+                          }}
                           style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
                         />
                         <span style={{ fontWeight: 600, maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

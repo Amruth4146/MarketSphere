@@ -58,7 +58,10 @@ export const request = async (endpoint, options = {}, isRetry = false) => {
         data.message ||
         (data.errors && data.errors.map((e) => e.message).join(', ')) ||
         `Request failed with status ${response.status}`;
-      throw new Error(errorMsg);
+      const err = new Error(errorMsg);
+      err.status = response.status;
+      err.data = data;
+      throw err;
     }
 
     return data;

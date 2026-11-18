@@ -2,6 +2,7 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import crypto from 'crypto';
@@ -28,6 +29,50 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 export const s3Service = {
+  /**
+   * Resolve public image URL for a given S3 key.
+   * Leverages CloudFront distribution when AWS_CLOUDFRONT_DOMAIN is set (recommended for private S3 buckets).
+   */
+  getPublicImageUrl: (key) => {
+    if (config.aws.cloudfrontDomain) {
+      const domain = config.aws.cloudfrontDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      return `https://${domain}/${key}`;
+    }
+    const bucket = config.aws.s3Bucket || 'marketsphere-bucket';
+    const region = config.aws.region || 'ap-south-1';
+    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+  },
+
+  /**
+   * Generate a presigned GET download/view URL for a private S3 object
+   */
+  getPresignedDownloadUrl: async (keyOrUrl, expiresIn = 3600) => {
+    let key = keyOrUrl;
+    if (keyOrUrl.startsWith('http')) {
+      try {
+        const parsed = new URL(keyOrUrl);
+        key = parsed.pathname.replace(/^\//, '');
+      } catch (e) {
+        key = keyOrUrl;
+      }
+    }
+
+    const client = getS3Client();
+    if (client && config.aws.s3Bucket) {
+      const command = new GetObjectCommand({
+        Bucket: config.aws.s3Bucket,
+        Key: key,
+      });
+      return await getSignedUrl(client, command, { expiresIn });
+    }
+
+    if (config.nodeEnv === 'production') {
+      throw new Error('AWS S3 storage is not configured in production. Presigned download URL generation failed.');
+    }
+
+    return `${s3Service.getPublicImageUrl(key)}?presigned=mock`;
+  },
+
   /**
    * Upload an image buffer directly to S3
    */
@@ -59,7 +104,7 @@ export const s3Service = {
 
       await client.send(command);
 
-      const url = `https://${config.aws.s3Bucket}.s3.${config.aws.region}.amazonaws.com/${key}`;
+      const url = s3Service.getPublicImageUrl(key);
       return { url, key, isMock: false };
     }
 
@@ -68,7 +113,7 @@ export const s3Service = {
     }
 
     // Mock storage URL in development when AWS credentials are not set
-    const mockUrl = `https://${config.aws.s3Bucket || 'marketsphere-bucket'}.s3.${config.aws.region || 'ap-south-1'}.amazonaws.com/${key}`;
+    const mockUrl = s3Service.getPublicImageUrl(key);
     return {
       url: mockUrl,
       key,
@@ -97,7 +142,7 @@ export const s3Service = {
       });
 
       const uploadUrl = await getSignedUrl(client, command, { expiresIn: 900 }); // 15 mins
-      const publicUrl = `https://${config.aws.s3Bucket}.s3.${config.aws.region}.amazonaws.com/${key}`;
+      const publicUrl = s3Service.getPublicImageUrl(key);
 
       return { uploadUrl, publicUrl, key, isMock: false };
     }
@@ -107,9 +152,9 @@ export const s3Service = {
     }
 
     // Mock Presigned URL
-    const publicUrl = `https://${config.aws.s3Bucket || 'marketsphere-bucket'}.s3.${config.aws.region || 'ap-south-1'}.amazonaws.com/${key}`;
+    const publicUrl = s3Service.getPublicImageUrl(key);
     return {
-      uploadUrl: `https://${config.aws.s3Bucket || 'marketsphere-bucket'}.s3.${config.aws.region || 'ap-south-1'}.amazonaws.com/${key}?mock=true`,
+      uploadUrl: `${publicUrl}?mock=true`,
       publicUrl,
       key,
       isMock: true,

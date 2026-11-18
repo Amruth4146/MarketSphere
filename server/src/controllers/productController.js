@@ -1,8 +1,10 @@
+import mongoose from 'mongoose';
 import { Product } from '../models/Product.js';
 import { Review } from '../models/Review.js';
 import { Category } from '../models/Category.js';
 import { cacheService } from '../services/cacheService.js';
 import { searchService } from '../services/searchService.js';
+import { config } from '../config/env.js';
 
 export const getProducts = async (req, res, next) => {
   try {
@@ -18,8 +20,8 @@ export const getProducts = async (req, res, next) => {
       featured,
     } = req.query;
 
-    // Check Elasticsearch if keyword is present
-    if (keyword) {
+    // Check Elasticsearch only if keyword is present and Elasticsearch is enabled
+    if (keyword && config.elasticsearch?.enabled) {
       const esResult = await searchService.search(keyword, {
         minPrice,
         maxPrice,
@@ -29,9 +31,9 @@ export const getProducts = async (req, res, next) => {
       });
 
       if (esResult) {
-        // Hydrate from DB for full category & vendor info
+        // Hydrate from DB for full category & vendor info, ensuring only published items are returned
         const ids = esResult.products.map((p) => p.id);
-        const products = await Product.find({ _id: { $in: ids } })
+        const products = await Product.find({ _id: { $in: ids }, status: 'published' })
           .populate('categoryId', 'name slug')
           .populate('vendorId', 'name avatar');
 
@@ -51,7 +53,7 @@ export const getProducts = async (req, res, next) => {
       }
     }
 
-    // Standard MongoDB query fallback
+    // Standard MongoDB query fallback (reliable default search engine)
     const query = { status: 'published' };
 
     if (keyword) {
@@ -59,6 +61,7 @@ export const getProducts = async (req, res, next) => {
         { title: { $regex: keyword, $options: 'i' } },
         { description: { $regex: keyword, $options: 'i' } },
         { brand: { $regex: keyword, $options: 'i' } },
+        { sku: { $regex: keyword, $options: 'i' } },
       ];
     }
 
@@ -68,9 +71,13 @@ export const getProducts = async (req, res, next) => {
           { slug: category },
           ...(category.match(/^[0-9a-fA-F]{24}$/) ? [{ _id: category }] : []),
         ],
+        isActive: true,
       });
       if (cat) {
         query.categoryId = cat._id;
+      } else {
+        // Requested category is inactive or non-existent
+        query.categoryId = new mongoose.Types.ObjectId();
       }
     }
 
@@ -139,11 +146,21 @@ export const getFeaturedProducts = async (req, res, next) => {
       });
     }
 
-    const products = await Product.find({ status: 'published', isFeatured: true })
+    let products = await Product.find({ status: 'published', isFeatured: true })
       .populate('categoryId', 'name slug')
       .populate('vendorId', 'name avatar')
       .limit(8)
       .lean();
+
+    // If no products are explicitly tagged isFeatured, showcase top published products
+    if (!products || products.length === 0) {
+      products = await Product.find({ status: 'published' })
+        .populate('categoryId', 'name slug')
+        .populate('vendorId', 'name avatar')
+        .sort({ averageRating: -1, createdAt: -1 })
+        .limit(8)
+        .lean();
+    }
 
     await cacheService.set(cacheKey, products, 1800);
 
@@ -174,8 +191,30 @@ export const getProductBySlugOrId = async (req, res, next) => {
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found',
+        message: 'Product not found or unavailable',
       });
+    }
+
+    // Archived products are unavailable
+    if (product.status === 'archived') {
+      return res.status(404).json({
+        success: false,
+        message: 'Product is unavailable (archived or removed)',
+      });
+    }
+
+    // Draft products are only viewable by their vendor or platform admins
+    if (product.status === 'draft') {
+      const isOwnerOrAdmin =
+        req.user &&
+        (req.user.role === 'admin' ||
+          product.vendorId?._id?.toString() === req.user._id?.toString());
+      if (!isOwnerOrAdmin) {
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found or unavailable',
+        });
+      }
     }
 
     const reviews = await Review.find({ productId: product._id })

@@ -1,11 +1,14 @@
 import { getElasticClient } from '../config/elasticsearch.js';
+import { config } from '../config/env.js';
 
 const INDEX_NAME = 'products_index';
 
 export const searchService = {
   initIndex: async () => {
+    if (!config.elasticsearch.enabled) return;
     try {
       const client = getElasticClient();
+      if (!client) return;
       const exists = await client.indices.exists({ index: INDEX_NAME });
       if (!exists) {
         await client.indices.create({
@@ -38,8 +41,10 @@ export const searchService = {
   },
 
   indexProduct: async (product) => {
+    if (!config.elasticsearch.enabled) return;
     try {
       const client = getElasticClient();
+      if (!client) return;
       await client.index({
         index: INDEX_NAME,
         id: product._id.toString(),
@@ -64,8 +69,10 @@ export const searchService = {
   },
 
   removeProduct: async (productId) => {
+    if (!config.elasticsearch.enabled) return;
     try {
       const client = getElasticClient();
+      if (!client) return;
       await client.delete({
         index: INDEX_NAME,
         id: productId.toString(),
@@ -76,8 +83,10 @@ export const searchService = {
   },
 
   search: async (queryText, filters = {}) => {
+    if (!config.elasticsearch.enabled) return null;
     try {
       const client = getElasticClient();
+      if (!client) return null;
       const { categoryId, minPrice, maxPrice, sort, page = 1, limit = 12 } = filters;
 
       const must = [];

@@ -3,26 +3,40 @@ import { Link } from 'react-router-dom';
 import { Star, ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 
+const FALLBACK_IMAGE =
+  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+const SVG_FALLBACK =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300' fill='%23f1f5f9'%3E%3Crect width='400' height='300' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='system-ui, sans-serif' font-size='14' fill='%2394a3b8'%3EImage Unavailable%3C/text%3E%3C/svg%3E";
+
 export const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
   const [added, setAdded] = useState(false);
+  const [imgSrc, setImgSrc] = useState(
+    product.images?.[0] || FALLBACK_IMAGE
+  );
 
+  const isOutOfStock = typeof product.stock === 'number' && product.stock <= 0;
   const activePrice = product.discountPrice || product.price;
   const hasDiscount = product.discountPrice && product.discountPrice < product.price;
   const discountPercent = hasDiscount
     ? Math.round(((product.price - product.discountPrice) / product.price) * 100)
     : 0;
 
+  const handleImageError = () => {
+    if (imgSrc !== FALLBACK_IMAGE) {
+      setImgSrc(FALLBACK_IMAGE);
+    } else {
+      setImgSrc(SVG_FALLBACK);
+    }
+  };
+
   const handleAdd = (e) => {
     e.preventDefault();
+    if (isOutOfStock) return;
     addToCart(product, 1);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   };
-
-  const imageSrc =
-    product.images?.[0] ||
-    'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
 
   return (
     <div
@@ -58,8 +72,10 @@ export const ProductCard = ({ product }) => {
         }}
       >
         <img
-          src={imageSrc}
+          src={imgSrc}
           alt={product.title}
+          onError={handleImageError}
+          loading="lazy"
           style={{
             position: 'absolute',
             top: 0,
@@ -77,7 +93,22 @@ export const ProductCard = ({ product }) => {
           }}
         />
 
-        {hasDiscount && (
+        {isOutOfStock ? (
+          <span
+            className="badge"
+            style={{
+              position: 'absolute',
+              top: '12px',
+              left: '12px',
+              zIndex: 2,
+              backgroundColor: '#ef4444',
+              color: '#ffffff',
+              fontWeight: 800,
+            }}
+          >
+            Out of Stock
+          </span>
+        ) : hasDiscount ? (
           <span
             className="badge badge-discount"
             style={{
@@ -90,9 +121,7 @@ export const ProductCard = ({ product }) => {
           >
             -{discountPercent}%
           </span>
-        )}
-
-        {product.isFeatured && !hasDiscount && (
+        ) : product.isFeatured ? (
           <span
             className="badge badge-primary"
             style={{
@@ -104,7 +133,7 @@ export const ProductCard = ({ product }) => {
           >
             Featured
           </span>
-        )}
+        ) : null}
       </Link>
 
       {/* Product Details */}
@@ -154,14 +183,19 @@ export const ProductCard = ({ product }) => {
 
           <button
             onClick={handleAdd}
-            className={`btn ${added ? 'btn-secondary' : 'btn-primary'}`}
+            disabled={isOutOfStock}
+            className={`btn ${added ? 'btn-secondary' : isOutOfStock ? 'btn-secondary' : 'btn-primary'}`}
             style={{
               padding: '0.5rem 0.85rem',
               borderRadius: 'var(--radius-md)',
               fontSize: '0.85rem',
+              opacity: isOutOfStock ? 0.65 : 1,
+              cursor: isOutOfStock ? 'not-allowed' : 'pointer',
             }}
           >
-            {added ? (
+            {isOutOfStock ? (
+              'Out of Stock'
+            ) : added ? (
               <>
                 <Check size={16} color="var(--success)" /> Added
               </>

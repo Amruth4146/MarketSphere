@@ -8,92 +8,38 @@ export const HomePage = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const loadHomeData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [featRes, catRes] = await Promise.allSettled([
+        productService.getFeatured(),
+        productService.getCategories(),
+      ]);
+
+      if (featRes.status === 'fulfilled' && Array.isArray(featRes.value)) {
+        setFeaturedProducts(featRes.value);
+      } else if (featRes.status === 'rejected') {
+        console.error('Featured products fetch failed:', featRes.reason);
+        setError(featRes.reason?.message || 'Failed to load featured products');
+      }
+
+      if (catRes.status === 'fulfilled' && Array.isArray(catRes.value)) {
+        setCategories(catRes.value);
+      }
+    } catch (err) {
+      console.error('Failed to load home data', err);
+      setError(err.message || 'Failed to connect to marketplace service');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadHomeData = async () => {
-      try {
-        const [featRes, catRes] = await Promise.allSettled([
-          productService.getFeatured(),
-          productService.getCategories(),
-        ]);
-
-        if (featRes.status === 'fulfilled' && featRes.value) {
-          setFeaturedProducts(featRes.value);
-        }
-        if (catRes.status === 'fulfilled' && catRes.value) {
-          setCategories(catRes.value);
-        }
-      } catch (err) {
-        console.error('Failed to load home data', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadHomeData();
   }, []);
-
-  const displayProducts =
-    featuredProducts.length > 0
-      ? featuredProducts
-      : [
-          {
-            _id: '1',
-            title: 'Sony WH-1000XM5 Wireless Noise-Cancelling Headphones',
-            slug: 'sony-wh-1000xm5-wireless-headphones',
-            price: 29990.0,
-            discountPrice: 26990.0,
-            averageRating: 4.9,
-            reviewCount: 42,
-            categoryId: { name: 'Electronics & Audio' },
-            images: [
-              'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
-            ],
-            isFeatured: true,
-          },
-          {
-            _id: '2',
-            title: 'Apple MacBook Air M3 15-inch (16GB RAM, 512GB SSD)',
-            slug: 'apple-macbook-air-m3-15-inch',
-            price: 134900.0,
-            discountPrice: 124900.0,
-            averageRating: 4.9,
-            reviewCount: 58,
-            categoryId: { name: 'Electronics & Audio' },
-            images: [
-              'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80',
-            ],
-            isFeatured: true,
-          },
-          {
-            _id: '3',
-            title: 'Minimalist Automatic Mechanical Watch with Sapphire Crystal',
-            slug: 'minimalist-automatic-mechanical-watch',
-            price: 14999.0,
-            discountPrice: 11999.0,
-            averageRating: 4.7,
-            reviewCount: 26,
-            categoryId: { name: 'Fashion & Apparel' },
-            images: [
-              'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80',
-            ],
-            isFeatured: true,
-          },
-          {
-            _id: '4',
-            title: 'Ergonomic High-Back Executive Mesh Office Chair',
-            slug: 'ergonomic-high-back-mesh-office-chair',
-            price: 18999.0,
-            discountPrice: 15499.0,
-            averageRating: 4.6,
-            reviewCount: 19,
-            categoryId: { name: 'Home & Living' },
-            images: [
-              'https://images.unsplash.com/photo-1580481077195-c3a821a58875?w=800&auto=format&fit=crop&q=80',
-            ],
-            isFeatured: true,
-          },
-        ];
 
   return (
     <div>
@@ -255,15 +201,57 @@ export const HomePage = () => {
           </Link>
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: '1.5rem',
-        }}>
-          {displayProducts.map((product) => (
-            <ProductCard key={product._id || product.slug} product={product} />
-          ))}
-        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)' }}>
+            Loading hand-picked marketplace highlights...
+          </div>
+        ) : error ? (
+          <div
+            style={{
+              padding: '2rem',
+              backgroundColor: '#fef2f2',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid #fecaca',
+              textAlign: 'center',
+            }}
+          >
+            <p style={{ color: '#b91c1c', fontWeight: 600, marginBottom: '1rem' }}>
+              {error}
+            </p>
+            <button onClick={loadHomeData} className="btn btn-primary">
+              Try Again
+            </button>
+          </div>
+        ) : featuredProducts.length === 0 ? (
+          <div
+            style={{
+              padding: '3rem 2rem',
+              backgroundColor: '#f8fafc',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px dashed var(--border)',
+              textAlign: 'center',
+            }}
+          >
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+              No featured arrivals currently highlighted. Explore our full catalog to discover authentic products.
+            </p>
+            <Link to="/products" className="btn btn-primary">
+              Browse All Products
+            </Link>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+              gap: '1.5rem',
+            }}
+          >
+            {featuredProducts.map((product) => (
+              <ProductCard key={product._id || product.slug} product={product} />
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

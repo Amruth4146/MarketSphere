@@ -1,5 +1,6 @@
 import multer from 'multer';
 import { s3Service } from '../services/s3Service.js';
+import { config } from '../config/env.js';
 
 // Memory storage for streaming to S3
 const storage = multer.memoryStorage();
@@ -74,6 +75,29 @@ export const deleteImage = async (req, res, next) => {
       message: 'Image deleted successfully',
       data: result,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Public image view/download endpoint for private S3 storage
+ * Redirects securely via CloudFront CDN or a temporary presigned GET URL (1 hour)
+ */
+export const viewImage = async (req, res, next) => {
+  try {
+    const key = req.params[0] || req.params.key || req.query.key;
+    if (!key) {
+      return res.status(400).json({ success: false, message: 'Image key is required' });
+    }
+
+    if (config.aws.cloudfrontDomain) {
+      const domain = config.aws.cloudfrontDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      return res.redirect(302, `https://${domain}/${key}`);
+    }
+
+    const downloadUrl = await s3Service.getPresignedDownloadUrl(key, 3600);
+    return res.redirect(302, downloadUrl);
   } catch (error) {
     next(error);
   }

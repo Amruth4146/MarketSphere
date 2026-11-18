@@ -50,6 +50,30 @@ export const protect = async (req, res, next) => {
 };
 
 /**
+ * Optional Authentication Middleware
+ * If a valid Bearer token is provided, populates req.user.
+ * If no token or token error, proceeds safely as guest (req.user = null).
+ */
+export const optionalProtect = async (req, res, next) => {
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    try {
+      const token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, config.jwt.secret);
+      const user = await User.findById(decoded.id).select('-password');
+      if (user && user.isActive) {
+        req.user = user;
+      }
+    } catch (error) {
+      // Proceed without authenticated user
+    }
+  }
+  next();
+};
+
+/**
  * Role-Based Access Control (RBAC)
  * Strictly verifies against the authenticated database user record (req.user.role)
  */

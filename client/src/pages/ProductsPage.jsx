@@ -10,6 +10,7 @@ export const ProductsPage = () => {
   const [categories, setCategories] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const activeCategory = searchParams.get('category') || '';
   const keyword = searchParams.get('keyword') || '';
@@ -32,6 +33,7 @@ export const ProductsPage = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
+      setError(null);
       try {
         const params = {
           keyword: searchParams.get('keyword') || '',
@@ -50,6 +52,7 @@ export const ProductsPage = () => {
         }
       } catch (err) {
         console.error('Error fetching products', err);
+        setError(err.message || 'Failed to retrieve products');
       } finally {
         setLoading(false);
       }
@@ -245,6 +248,26 @@ export const ProductsPage = () => {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '5rem 0', color: 'var(--text-muted)' }}>
               Loading products...
+            </div>
+          ) : error ? (
+            <div
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid #fecaca',
+                padding: '4rem 2rem',
+                textAlign: 'center',
+              }}
+            >
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem', color: '#b91c1c' }}>
+                Unable to Retrieve Products
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                {error}
+              </p>
+              <button onClick={fetchProducts} className="btn btn-primary">
+                Try Again
+              </button>
             </div>
           ) : products.length === 0 ? (
             <div style={{
